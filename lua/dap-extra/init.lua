@@ -76,8 +76,6 @@ function M.setup(opts)
 	debug_ui.setup()
 	dap.defaults.fallback.switchbuf = debug_ui.jump
 	dap.listeners.after.event_initialized['dapui_config'] = debug_ui.open
-	dap.listeners.before.event_terminated['dapui_config'] = debug_ui.close
-	dap.listeners.before.event_exited['dapui_config'] = debug_ui.close
 	configured = true
 end
 

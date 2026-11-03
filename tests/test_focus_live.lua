@@ -2,10 +2,9 @@ local root = dofile(vim.fs.dirname(debug.getinfo(1, 'S').source:sub(2)) .. '/boo
 local dap = require('dap')
 local ui = require('dap-extra.ui')
 local repl = require('dap.repl')
-require('dapui').setup()
-require('dap-extra.repl').setup()
-dap.defaults.fallback.switchbuf = ui.jump
-dap.listeners.after.event_initialized.focus_check = ui.open
+require('dap-extra').setup()
+local process_id
+dap.listeners.after.event_process.quit_check = function(_, body) process_id = body.systemProcessId end
 dap.adapters.cppdbg = { id = 'cppdbg', type = 'executable', command = vim.fn.stdpath('data') .. '/mason/bin/OpenDebugAD7' }
 local directory = vim.fn.tempname()
 vim.fn.mkdir(directory, 'p')
@@ -16,18 +15,24 @@ vim.fn.writefile({
 	'  value += 2;',
 	'  return value;',
 	'}',
-	'int main(void) {',
-	'  return inner(3);',
+	'int main(int argc, char **argv) {',
+	'  int result = inner(3);',
+	'  if (argc > 1) while (1) {}',
+	'  extern int puts(const char *); puts("debuggee finished");',
+	'  return result;',
 	'}',
 }, file)
-assert(vim.system({ 'cc', '-g', '-O0', file, '-o', directory .. '/focus' }):wait().code == 0)
+local compiled = vim.system({ 'cc', '-g', '-O0', file, '-o', directory .. '/focus' }):wait()
+assert(compiled.code == 0, compiled.stderr)
 vim.cmd.edit(file)
 vim.cmd.vsplit()
 local origin = vim.api.nvim_get_current_win()
 local layout = vim.fn.winlayout()
 require('dap.breakpoints').set({}, vim.api.nvim_get_current_buf(), 2)
+local keep_running = false
 ui.action(function()
 	dap.run({ name = 'focus check', type = 'cppdbg', request = 'launch', program = directory .. '/focus',
+		args = function() return keep_running and { '--wait' } or {} end,
 		cwd = directory, MIMode = 'gdb', miDebuggerPath = '/usr/bin/gdb', stopAtEntry = false })
 end)()
 local function stopped()
@@ -67,9 +72,37 @@ require('dap.ui.widgets').hover('value')
 vim.wait(200, function() return false end)
 assert(vim.api.nvim_get_current_tabpage() == vim.api.nvim_win_get_tabpage(origin))
 assert(vim.deep_equal(vim.fn.winlayout(), layout))
-ui.setup()
-vim.cmd('DapClean')
+vim.api.nvim_set_current_win(repl_win)
+dap.continue()
+assert(vim.wait(5000, function() return dap.session() == nil end, 20), 'Program did not finish naturally')
+assert(vim.api.nvim_win_is_valid(repl_win), 'Natural exit closed the REPL')
+local console = require('dapui').elements.console.buffer()
+assert(vim.wait(5000, function()
+	for _, buffer in ipairs({ console, vim.api.nvim_win_get_buf(repl_win) }) do
+		if table.concat(vim.api.nvim_buf_get_lines(buffer, 0, -1, false), '\n'):find('debuggee finished', 1, true) then
+			return true
+		end
+	end
+end, 20), 'Final program output was not preserved')
+assert(#vim.api.nvim_tabpage_list_wins(debug_tab) > 1, 'Natural exit closed debugger panes')
+keep_running = true
+repl.execute('run')
+assert(vim.wait(15000, stopped, 20), 'Run did not restart the last configuration after exit')
+local old_session = dap.session()
+repl.execute('r')
+assert(vim.wait(15000, function() return stopped() and dap.session() ~= old_session end, 20),
+	'Run did not restart the active session')
+dap.continue()
+local notifications, notify = {}, vim.notify
+vim.notify = function(message, ...) notifications[#notifications + 1] = message; notify(message, ...) end
+repl.execute('quit')
 assert(vim.wait(5000, function() return dap.session() == nil end, 20))
-assert(#vim.api.nvim_tabpage_list_wins(debug_tab) == 1)
+assert(vim.wait(5000, function() return vim.tbl_contains(notifications, 'Debugging stopped') end, 20))
+vim.notify = notify
+assert(process_id, 'Adapter did not report the debuggee process ID')
+assert(vim.wait(5000, function() return vim.uv.kill(process_id, 0) == nil end, 20), 'Debuggee survived quit')
+assert(vim.api.nvim_win_is_valid(repl_win), 'Quit closed the REPL')
+vim.api.nvim_set_current_tabpage(debug_tab)
+vim.cmd('tabclose')
 vim.fn.delete(directory, 'rf')
-print('Live GDB REPL stepping, frame navigation, hover and local source checks passed')
+print('Live GDB REPL stepping, frame navigation, source and running-debuggee quit checks passed')

@@ -36,14 +36,41 @@ function M.action(callback, use_cursor)
 	end
 end
 
-function M.open()
+local function open(opts)
 	if vim.bo.filetype == 'dap-repl' then
 		ensure()
-		vim.api.nvim_win_call(source, function() require('dapui').open() end)
+		vim.api.nvim_win_call(source, function() require('dapui').open(opts) end)
 		return
 	end
 	M.focus()
-	require('dapui').open()
+	require('dapui').open(opts)
+end
+
+function M.open()
+	open()
+end
+
+function M.reset()
+	ensure()
+	local repl = vim.bo.filetype == 'dap-repl' and vim.api.nvim_get_current_buf()
+	vim.api.nvim_win_call(source, function()
+		-- Upstream considers partially closed layouts open, then resizes stale window IDs.
+		for index, layout in ipairs(require('dapui.windows').layouts) do
+			for _, win in ipairs(layout.opened_wins) do
+				if not vim.api.nvim_win_is_valid(win) then
+					require('dapui').close({ layout = index })
+					require('dapui').open({ layout = index, reset = true })
+					break
+				end
+			end
+		end
+	end)
+	open({ reset = true })
+	if repl then
+		for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tab)) do
+			if vim.api.nvim_win_get_buf(win) == repl then vim.api.nvim_set_current_win(win); break end
+		end
+	end
 end
 
 function M.close()
@@ -67,6 +94,9 @@ function M.cleanup()
 end
 
 function M.setup()
+	vim.api.nvim_create_user_command('DapReset', M.reset, {
+		force = true, desc = 'Restore configured debugger pane sizes',
+	})
 	vim.api.nvim_create_user_command('DapClean', M.cleanup, {
 		force = true, desc = 'Terminate debugging, clear annotations and close debugger panes',
 	})

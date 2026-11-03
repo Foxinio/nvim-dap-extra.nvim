@@ -37,7 +37,7 @@ vim.keymap.set('n', '<leader>dg', ui.local_frame)
 `action(callback, use_cursor)` routes to a shared debug tab and forwards all
 arguments. Set `use_cursor` for source-sensitive actions such as run-to-cursor.
 `focus()`, `toggle()`, `repl()`, `open()`, `close()`, `jump(buf, line, column)`,
-`local_frame()`, and `cleanup()` remain available. Columns passed to `jump`
+`local_frame()`, `reset()`, and `cleanup()` remain available. Columns passed to `jump`
 are one-based. Local frame navigation preserves the selected frame and splits.
 
 The debugger uses one dedicated tab across sessions. Actions wrapped with
@@ -45,8 +45,13 @@ The debugger uses one dedicated tab across sessions. Actions wrapped with
 that tab. `action(callback, true)` retains the invoking file and cursor;
 wrapped actions use the invoking cwd. Bind breakpoint editing and value hover
 directly to nvim-dap to keep them in the invoking window and tab.
-Use `gt` / `gT` to switch between tabs. Stopping closes the debugger panes but
-leaves its source tab available.
+Use `gt` / `gT` to switch between tabs. Debugger panes stay open after the
+program exits or debugging stops, so final output remains available. Use
+`:DapClean` to close them explicitly.
+
+Use `:DapReset` to restore configured debugger pane sizes and reopen missing
+panes without interrupting debugging. It uses the existing debug tab and does
+not reconstruct manually rearranged splits.
 
 Use `:DapClean` to terminate debugging, clear inline debugger annotations and
 cached values, and close debugger panes and the REPL, even after a session has
@@ -66,6 +71,22 @@ These bindings are buffer-local.
 
 The REPL accepts `s`, `n`, `si`, `ni`, `fin`, `c`, `p expression`, `i locals`,
 and `gdb arbitrary-command`.
+Use `r` or `run` to restart the current session from the beginning, or start
+the last debug configuration when no session is active. If nothing has been
+run yet, nvim-dap reports that no configuration is available to rerun.
+
+Use `q` or `quit` to terminate the current debug session asynchronously. Wait
+for the `Debugging stopped` notification before closing the debug tab. These
+commands request termination even for attached programs, without invoking
+`:DapClean`; debugger panes remain open. With no active session they report
+`No active debug session`. Process termination depends on
+the adapter honoring the request.
+
+The Console uses Neovim's integrated terminal. Long output can be split into
+terminal rows even with `nowrap`, and resizing does not repair old scrollback.
+See the [Console wrapping investigation](docs/console-wrapping.md) for a
+reproduction and follow-up recommendation.
+
 Multiline definitions
 belong in startup commands; this pane is a DAP REPL, not an interactive terminal.
 REPL commands and subsequent stops update the debug source and variables without
@@ -88,6 +109,7 @@ DAP, keeping them synchronized. Relative moves stop at the ends of the stack.
 ```sh
 nvim --headless -u NONE -i NONE -l tests/test.lua
 nvim --headless -u NONE -i NONE -l tests/test_panes.lua
+nvim --headless -u NONE -i NONE -l tests/test_controls.lua
 nvim --headless -u NONE -i NONE -l tests/test_focus_live.lua
 ```
 

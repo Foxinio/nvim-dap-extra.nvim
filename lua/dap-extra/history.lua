@@ -27,12 +27,22 @@ function M.attach(buffer)
 	vim.keymap.set('i', '<Up>', function() navigate(-1) end, { buffer = buffer, desc = 'Previous command matching prefix' })
 	vim.keymap.set('i', '<Down>', function() navigate(1) end, { buffer = buffer, desc = 'Next command matching prefix' })
 	vim.keymap.set('i', '<CR>', function()
-		local text = input()
+		local text, prompt = input()
 		if text ~= '' and text ~= history[#history] then
 			history[#history + 1] = text
 			if #history > 100 then table.remove(history, 1) end
 		end
 		search = nil
+		if vim.bo[buffer].filetype == 'dap-repl' then
+			local command = require('dap-extra.repl').inactive_command(text)
+			if command then
+				vim.schedule(function()
+					require('dap.repl').append(prompt .. text)
+					command()
+				end)
+				return '<C-U>'
+			end
+		end
 		return '<CR>'
 	end, { buffer = buffer, expr = true, desc = 'Submit debugger command' })
 end
