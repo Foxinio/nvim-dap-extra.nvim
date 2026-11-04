@@ -8,6 +8,15 @@ local function ensure()
 		source = vim.api.nvim_get_current_win()
 	else
 		if not vim.api.nvim_win_is_valid(source) or vim.api.nvim_win_get_tabpage(source) ~= tab then
+			for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tab)) do
+				local buffer = vim.api.nvim_win_get_buf(win)
+				local filetype = vim.bo[buffer].filetype
+				if filetype ~= 'dap-repl' and not filetype:match('^dapui_')
+					and vim.bo[buffer].buftype ~= 'terminal' and vim.api.nvim_win_get_config(win).relative == '' then
+					source = win
+					return
+				end
+			end
 			vim.api.nvim_win_call(vim.api.nvim_tabpage_list_wins(tab)[1], function()
 				vim.cmd('topleft new')
 				source = vim.api.nvim_get_current_win()

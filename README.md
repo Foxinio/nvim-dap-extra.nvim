@@ -48,6 +48,7 @@ directly to nvim-dap to keep them in the invoking window and tab.
 Use `gt` / `gT` to switch between tabs. Debugger panes stay open after the
 program exits or debugging stops, so final output remains available. Use
 `:DapClean` to close them explicitly.
+Starting a debug session focuses the REPL in insert mode, ready for commands.
 
 Use `:DapReset` to restore configured debugger pane sizes and reopen missing
 panes without interrupting debugging. It uses the existing debug tab and does

@@ -30,6 +30,12 @@ local origin = vim.api.nvim_get_current_win()
 local layout = vim.fn.winlayout()
 require('dap.breakpoints').set({}, vim.api.nvim_get_current_buf(), 2)
 local keep_running = false
+local entered_repl = false
+local startinsert = vim.cmd.startinsert
+vim.cmd.startinsert = function(opts)
+	entered_repl = vim.bo.filetype == 'dap-repl' and opts.bang
+	startinsert(opts)
+end
 ui.action(function()
 	dap.run({ name = 'focus check', type = 'cppdbg', request = 'launch', program = directory .. '/focus',
 		args = function() return keep_running and { '--wait' } or {} end,
@@ -39,14 +45,17 @@ local function stopped()
 	return dap.session() and dap.session().current_frame ~= nil
 end
 assert(vim.wait(15000, stopped, 20), 'Initial breakpoint did not stop')
-local source = vim.api.nvim_get_current_win()
+assert(vim.bo.filetype == 'dap-repl', 'Debugger startup must focus the REPL')
+vim.cmd.startinsert = startinsert
+assert(entered_repl, 'Debugger startup must enter REPL insert mode')
+local source
 local debug_tab = vim.api.nvim_get_current_tabpage()
-repl.open()
 local repl_win
 for _, win in ipairs(vim.api.nvim_tabpage_list_wins(debug_tab)) do
 	if vim.bo[vim.api.nvim_win_get_buf(win)].filetype == 'dap-repl' then repl_win = win end
+	if vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(win)) == file then source = win end
 end
-vim.api.nvim_set_current_win(assert(repl_win))
+assert(source and repl_win)
 local function focused() assert(vim.api.nvim_get_current_win() == repl_win, 'REPL lost focus') end
 repl.execute('up')
 assert(vim.wait(5000, function() return stopped() and dap.session().current_frame.name:find('main', 1, true) end, 20),

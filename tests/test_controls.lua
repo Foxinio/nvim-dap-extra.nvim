@@ -107,6 +107,15 @@ require('dap-extra.repl').setup()
 assert(repl.execute == wrapped_execute, 'Repeated REPL setup must not stack wrappers')
 dap.restart, dap.run_last = restart, run_last
 dap.session, dap.terminate, vim.notify = session, terminate, notify
+vim.api.nvim_set_current_win(source)
+vim.cmd.vsplit()
+local surviving_source = vim.api.nvim_get_current_win()
+vim.api.nvim_win_close(source, true)
+local windows_before_reset = #vim.api.nvim_tabpage_list_wins(debug_tab)
+vim.cmd('DapReset')
+assert(#vim.api.nvim_tabpage_list_wins(debug_tab) == windows_before_reset,
+	'Reset must reuse a surviving source window instead of adding a top pane')
+assert(vim.api.nvim_get_current_win() == surviving_source)
 vim.api.nvim_set_current_tabpage(original_tab)
 assert(vim.deep_equal(vim.fn.winlayout(), original_layout))
 print('Debugger reset and asynchronous REPL quit checks passed')
