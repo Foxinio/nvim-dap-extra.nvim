@@ -25,6 +25,15 @@ language configurations, Mason, and global mappings belong to the caller.
 Only generic GDB REPL shortcuts need a GDB/cppdbg session; loading the plugin
 does not require GDB or an adapter.
 
+For `cppdbg` sessions with `MIMode = 'gdb'` (or omitted), setup automatically
+adds `catch throw` and
+`handle SIGABRT SIGSEGV SIGBUS SIGILL SIGFPE stop print pass` to startup commands.
+This stops on every C++ throw, including handled exceptions, and on common fatal
+signals before delivery, including assertion failures that call `abort()`.
+Continuing delivers the signal and may terminate the program. Existing
+`setupCommands` run afterward and can override signal handling. Other adapters
+and explicit LLDB sessions are unchanged; no `pthread_kill` breakpoint is added.
+
 ## UI helpers
 
 ```lua
@@ -112,9 +121,10 @@ nvim --headless -u NONE -i NONE -l tests/test.lua
 nvim --headless -u NONE -i NONE -l tests/test_panes.lua
 nvim --headless -u NONE -i NONE -l tests/test_controls.lua
 nvim --headless -u NONE -i NONE -l tests/test_focus_live.lua
+nvim --headless -u NONE -i NONE -l tests/test_exceptions_live.lua
 ```
 
 Run from this plugin directory. Tests use only declared dependencies in
 Neovim's data/lazy (`NVIM_TEST_DEPENDENCIES` overrides the parent directory)
-and change to an unrelated cwd. The live suite needs cc, GDB, ptrace and
+and change to an unrelated cwd. The live suites need cc, c++, GDB, ptrace and
 OpenDebugAD7 in Neovim's data/mason/bin.

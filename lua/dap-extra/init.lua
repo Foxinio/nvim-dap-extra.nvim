@@ -5,6 +5,19 @@ function M.setup(opts)
 	if configured then return end
 	opts = opts or {}
 	local dap, dapui = require('dap'), require('dapui')
+	dap.listeners.on_config['dap-extra'] = function(config)
+		if config.type ~= 'cppdbg' or (config.MIMode and config.MIMode ~= 'gdb') then return config end
+		config = vim.deepcopy(config)
+		local commands = config.setupCommands or {}
+		local defaults = {}
+		for _, text in ipairs({ 'catch throw', 'handle SIGABRT SIGSEGV SIGBUS SIGILL SIGFPE stop print pass' }) do
+			if not vim.iter(commands):any(function(command) return command.text == text end) then
+				defaults[#defaults + 1] = { text = text }
+			end
+		end
+		config.setupCommands = vim.list_extend(defaults, commands)
+		return config
+	end
 	require('nvim-dap-virtual-text').setup(vim.tbl_deep_extend('force', {
 		enabled = true,
 		highlight_changed_variables = true,

@@ -17,6 +17,27 @@ local render = require('dapui').elements.breakpoints.render
 vim.wait(20, function() return false end)
 require('dap-extra').setup()
 assert(listener_count() == listeners and require('dapui').elements.breakpoints.render == render)
+local configure = dap.listeners.on_config['dap-extra']
+local defaults = {
+	{ text = 'catch throw' },
+	{ text = 'handle SIGABRT SIGSEGV SIGBUS SIGILL SIGFPE stop print pass' },
+}
+for _, request in ipairs({ 'launch', 'attach' }) do
+	for _, mode in ipairs({ 'gdb', false }) do
+		local config = { type = 'cppdbg', request = request, MIMode = mode or nil }
+		assert(vim.deep_equal(configure(config).setupCommands, defaults))
+		assert(config.setupCommands == nil, 'Defaults mutated the original configuration')
+	end
+end
+local config = { type = 'cppdbg', setupCommands = { { text = 'handle SIGABRT nostop' } } }
+local original = vim.deepcopy(config)
+local prepared = configure(config)
+assert(vim.deep_equal(config, original))
+assert(vim.deep_equal(prepared.setupCommands, vim.list_extend(vim.deepcopy(defaults), config.setupCommands)))
+assert(vim.deep_equal(configure(prepared), prepared), 'Repeated configuration duplicated defaults')
+for _, excluded in ipairs({ { type = 'debugpy' }, { type = 'codelldb' }, { type = 'cppdbg', MIMode = 'lldb' } }) do
+	assert(configure(excluded) == excluded)
+end
 local session = dap.session
 local execute = repl.execute
 local forwarded = {}
