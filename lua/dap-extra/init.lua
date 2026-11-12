@@ -89,7 +89,8 @@ function M.setup(opts)
 	local debug_ui = require('dap-extra.ui')
 	debug_ui.setup()
 	dap.defaults.fallback.switchbuf = debug_ui.jump
-	dap.listeners.after.event_initialized['dapui_config'] = function()
+	-- Not 'dapui_config': that is the key dap-ui's README suggests for user listeners.
+	dap.listeners.after.event_initialized['dap-extra'] = function()
 		debug_ui.open()
 		for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
 			if vim.bo[vim.api.nvim_win_get_buf(win)].filetype == 'dap-repl' then
