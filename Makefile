@@ -1,5 +1,5 @@
 NVIM ?= nvim
-DEPS := mfussenegger/nvim-dap rcarriga/nvim-dap-ui nvim-neotest/nvim-nio theHamsta/nvim-dap-virtual-text
+DEPS := mfussenegger/nvim-dap Foxinio/nvim-dap-ui nvim-neotest/nvim-nio theHamsta/nvim-dap-virtual-text
 # Directory holding the dependencies; defaults to lazy.nvim's plugin directory.
 export DEPS_DIR
 

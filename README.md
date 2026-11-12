@@ -10,7 +10,7 @@ and cleanup. Requires Neovim 0.11+.
   'Foxinio/nvim-dap-extra.nvim',
   lazy = false,
   dependencies = {
-    'mfussenegger/nvim-dap', 'rcarriga/nvim-dap-ui',
+    'mfussenegger/nvim-dap', 'Foxinio/nvim-dap-ui', -- fork: source_window routing
     'nvim-neotest/nvim-nio', 'theHamsta/nvim-dap-virtual-text',
   },
   opts = { dapui = {}, virtual_text = {} },
