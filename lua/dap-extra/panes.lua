@@ -2,6 +2,20 @@ local M = {}
 
 function M.setup()
 	local util = require('dapui.util')
+	if not M.show_line then
+		local hover = require('dapui.render.line_hover')
+		M.show_line = hover.show
+		hover.show = function(...)
+			local windows = vim.api.nvim_list_wins()
+			M.show_line(...)
+			for _, win in ipairs(vim.api.nvim_list_wins()) do
+				if not vim.tbl_contains(windows, win) then
+					-- A hover appearing between mouse press and release must not intercept the release.
+					vim.api.nvim_win_set_config(win, { focusable = false, mouse = false })
+				end
+			end
+		end
+	end
 	if not M.open_buf then
 		M.open_buf = util.open_buf
 		util.open_buf = function(buffer, line, column)

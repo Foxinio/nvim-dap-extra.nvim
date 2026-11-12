@@ -8,8 +8,11 @@ require('dap-extra').setup()
 require('dap-extra.panes').setup()
 local util = require('dapui.util')
 local open_buf, render_before = util.open_buf, dapui.elements.breakpoints.render
+local hover = require('dapui.render.line_hover')
+local show_line = hover.show
 require('dap-extra.panes').setup()
 assert(util.open_buf == open_buf and dapui.elements.breakpoints.render == render_before)
+assert(hover.show == show_line, 'Repeated setup wrapped line hovers again')
 dap.defaults.fallback.switchbuf = ui.jump
 vim.cmd.edit(root .. '/tests/test_panes.lua')
 local buffer = vim.api.nvim_get_current_buf()
@@ -78,4 +81,27 @@ assert(stopped.current_frame == frame and vim.api.nvim_get_current_win() == sour
 assert(vim.api.nvim_win_get_cursor(source)[1] == 4)
 dap.session = original_session
 breakpoints.clear()
+vim.api.nvim_set_current_win(vim.fn.bufwinid(pane.buffer()))
+local long_line = string.rep('long_stack_frame_', 12)
+vim.bo[pane.buffer()].modifiable = true
+vim.api.nvim_buf_set_lines(pane.buffer(), 0, -1, false, { long_line })
+vim.bo[pane.buffer()].modifiable = false
+vim.api.nvim_win_set_cursor(0, { 1, 0 })
+local unrelated = vim.api.nvim_open_win(vim.api.nvim_create_buf(false, true), false,
+	{ relative = 'editor', row = 0, col = 60, width = 10, height = 1, focusable = true })
+local windows = vim.api.nvim_list_wins()
+hover.show()
+local line_hover
+for _, win in ipairs(vim.api.nvim_list_wins()) do
+	if not vim.tbl_contains(windows, win) then line_hover = win end
+end
+assert(line_hover, 'Long-line expansion no longer creates a hover')
+local hover_config = vim.api.nvim_win_get_config(line_hover)
+assert(not hover_config.focusable and not hover_config.mouse, 'Long-line hover intercepts mouse input')
+assert(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(line_hover), 0, 1, false)[1] == long_line)
+hover.show()
+assert(vim.api.nvim_win_is_valid(line_hover) and not vim.api.nvim_win_get_config(line_hover).mouse)
+assert(vim.api.nvim_win_get_config(unrelated).focusable, 'Unrelated float was changed')
+vim.api.nvim_win_close(line_hover, true)
+vim.api.nvim_win_close(unrelated, true)
 print('Debugger pane bindings, source routing and disabled breakpoint removal passed')

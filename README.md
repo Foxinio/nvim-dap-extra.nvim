@@ -88,6 +88,9 @@ Breakpoints, Enter or `o` focuses the breakpoint's source without changing frame
 selection, `t` enables/disables it, and `d` removes it (including disabled entries).
 These bindings are buffer-local.
 
+Long-line hovers remain visible and pass mouse input through to the pane below,
+so a hover appearing during a click cannot turn its release into a selection.
+
 The REPL accepts `s`, `n`, `si`, `ni`, `fin`, `c`, `p expression`, `i locals`,
 and `gdb arbitrary-command`.
 Use `r` or `run` to restart the current session from the beginning, or start
