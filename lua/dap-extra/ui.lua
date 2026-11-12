@@ -138,6 +138,8 @@ end
 function M.jump(bufnr, line, column)
 	if vim.bo.filetype == 'dap-repl' then ensure() else M.focus() end
 	vim.api.nvim_win_set_buf(source, bufnr)
+	-- Missing library sources can have fewer lines than the debugger reports.
+	line = math.max(1, math.min(line, vim.api.nvim_buf_line_count(bufnr)))
 	vim.api.nvim_win_set_cursor(source, { line, math.max(0, column - 1) })
 end
 

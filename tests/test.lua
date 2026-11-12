@@ -21,6 +21,7 @@ local configure = dap.listeners.on_config['dap-extra']
 local defaults = {
 	{ text = 'catch throw' },
 	{ text = 'handle SIGABRT SIGSEGV SIGBUS SIGILL SIGFPE stop print pass' },
+	{ text = '-break-insert -f pthread_kill' },
 }
 for _, request in ipairs({ 'launch', 'attach' }) do
 	for _, mode in ipairs({ 'gdb', false }) do
@@ -184,6 +185,10 @@ local target = vim.api.nvim_create_buf(false, true)
 vim.api.nvim_buf_set_lines(target, 0, -1, false, { 'first', 'second' })
 debug_ui.jump(target, 2, 1)
 assert(vim.api.nvim_get_current_tabpage() == debug_tab and vim.api.nvim_get_current_buf() == target)
+debug_ui.jump(target, 1000, 1)
+assert(vim.api.nvim_win_get_cursor(0)[1] == 2, 'Unavailable source line interrupted the source jump')
+debug_ui.jump(target, 0, 1)
+assert(vim.api.nvim_win_get_cursor(0)[1] == 1)
 vim.api.nvim_set_current_tabpage(original_tab)
 debug_ui.close()
 assert(vim.api.nvim_get_current_tabpage() == original_tab)

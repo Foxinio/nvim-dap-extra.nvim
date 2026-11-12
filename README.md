@@ -26,13 +26,16 @@ Only generic GDB REPL shortcuts need a GDB/cppdbg session; loading the plugin
 does not require GDB or an adapter.
 
 For `cppdbg` sessions with `MIMode = 'gdb'` (or omitted), setup automatically
-adds `catch throw` and
-`handle SIGABRT SIGSEGV SIGBUS SIGILL SIGFPE stop print pass` to startup commands.
+adds `catch throw`,
+`handle SIGABRT SIGSEGV SIGBUS SIGILL SIGFPE stop print pass`, and a pending
+`pthread_kill` function breakpoint to startup commands.
 This stops on every C++ throw, including handled exceptions, and on common fatal
 signals before delivery, including assertion failures that call `abort()`.
 Continuing delivers the signal and may terminate the program. Existing
 `setupCommands` run afterward and can override signal handling. Other adapters
-and explicit LLDB sessions are unchanged; no `pthread_kill` breakpoint is added.
+and explicit LLDB sessions are unchanged. Every `pthread_kill` call stops,
+including calls sending harmless signals. Missing library source files do not
+prevent the Stacks pane from refreshing to the current stop.
 
 ## UI helpers
 
