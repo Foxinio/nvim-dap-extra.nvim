@@ -59,6 +59,12 @@ program exits or debugging stops, so final output remains available. Use
 `:DapClean` to close them explicitly.
 Starting a debug session focuses the REPL in insert mode, ready for commands.
 
+If optional [Tabby.nvim](https://github.com/nanozuki/tabby.nvim) is available,
+the debug tab is named `DEBUGGER (my_app)` using the resolved program filename,
+or the configuration name when no program path is available. Before a session
+starts it is named `DEBUGGER`; the last target label stays after the session ends.
+No additional setup is needed, and Tabby is not installed automatically.
+
 Use `:DapReset` to restore configured debugger pane sizes and reopen missing
 panes without interrupting debugging. It uses the existing debug tab and does
 not reconstruct manually rearranged splits.

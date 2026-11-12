@@ -129,6 +129,34 @@ local tab_count = #vim.api.nvim_list_tabpages()
 debug_ui.open()
 local debug_tab = vim.api.nvim_get_current_tabpage()
 assert(debug_tab ~= original_tab and #vim.api.nvim_list_tabpages() == tab_count + 1)
+local tab_names = {}
+package.loaded['tabby.feature.tab_name'] = {
+	set = function(tab, name) tab_names[tab] = name end,
+	get_raw = function(tab) return tab_names[tab] or '' end,
+}
+debug_ui.focus()
+assert(tab_names[debug_tab] == 'DEBUGGER')
+local target_session = { config = { program = '/work/build/my_app', name = 'Launch application' } }
+dap.session = function() return target_session end
+dap.listeners.after.event_initialized['dapui_config']()
+assert(tab_names[debug_tab] == 'DEBUGGER (my_app)')
+target_session.config = { program = '/work/build/other_app' }
+debug_ui.open()
+assert(tab_names[debug_tab] == 'DEBUGGER (other_app)')
+for _, program in ipairs({ '', false, function() return '/unresolved' end }) do
+	target_session.config = { program = program, name = 'Attach to application' }
+	debug_ui.focus()
+	assert(tab_names[debug_tab] == 'DEBUGGER (Attach to application)')
+end
+target_session.config = {}
+debug_ui.focus()
+assert(tab_names[debug_tab] == 'DEBUGGER')
+target_session.config = { program = '/work/build/my_app' }
+debug_ui.focus()
+dap.session = session
+debug_ui.focus()
+assert(tab_names[debug_tab] == 'DEBUGGER (my_app)', 'Preserve the target after session exit')
+assert(tab_names[original_tab] == nil, 'Only rename the debugger tab')
 debug_ui.open()
 assert(#vim.api.nvim_list_tabpages() == tab_count + 1, 'Reuse the debugger tab')
 vim.api.nvim_set_current_tabpage(original_tab)
@@ -237,6 +265,8 @@ vim.api.nvim_set_current_tabpage(debug_tab)
 vim.cmd('tabclose')
 debug_ui.open()
 assert(vim.api.nvim_get_current_tabpage() ~= original_tab, 'Recreate a manually closed debugger tab')
+assert(tab_names[vim.api.nvim_get_current_tabpage()] == 'DEBUGGER', 'Name the recreated debugger tab')
+package.loaded['tabby.feature.tab_name'] = nil
 debug_ui.close()
 debug_ui.setup()
 local terminate, pending = dap.terminate, nil

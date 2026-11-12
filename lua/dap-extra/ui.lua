@@ -1,7 +1,7 @@
 local M = {}
 local tab, source
 
-local function ensure()
+local function ensure_source()
 	if not tab or not vim.api.nvim_tabpage_is_valid(tab) then
 		vim.cmd('tab split')
 		tab = vim.api.nvim_get_current_tabpage()
@@ -23,6 +23,20 @@ local function ensure()
 			end)
 		end
 	end
+end
+
+local function ensure()
+	ensure_source()
+	local ok, tab_name = pcall(require, 'tabby.feature.tab_name')
+	if not ok then return end
+	local session = require('dap').session()
+	local config = session and session.config
+	if not config and tab_name.get_raw(tab) ~= '' then return end
+	local target = config and config.name
+	if config and type(config.program) == 'string' and config.program ~= '' then
+		target = vim.fn.fnamemodify(config.program, ':t')
+	end
+	tab_name.set(tab, type(target) == 'string' and target ~= '' and ('DEBUGGER (' .. target .. ')') or 'DEBUGGER')
 end
 
 function M.focus()
