@@ -62,7 +62,13 @@ function M.setup()
 		local command = name
 		repl.commands.custom_commands[command] = function(args) gdb(command, args) end
 	end
-	repl.commands.custom_commands.gdb = function(args) gdb(args) end
+	repl.commands.custom_commands.gdb = function(args)
+		if not args or vim.trim(args) == '' then
+			repl.append('Usage: gdb <command>')
+			return
+		end
+		gdb(vim.trim(args))
+	end
 	for _, name in ipairs({ 'up', 'down', 'frame', 'bt' }) do
 		local command = name
 		repl.commands.custom_commands[command] = function(args)
