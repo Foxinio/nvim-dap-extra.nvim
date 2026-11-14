@@ -1,6 +1,11 @@
 local M = {}
 local tab, source
 
+local function track(win)
+	local dapui = package.loaded.dapui
+	if dapui and dapui.source_window then dapui.source_window.set(win) end
+end
+
 local function ensure_source()
 	if not tab or not vim.api.nvim_tabpage_is_valid(tab) then
 		vim.cmd('tab split')
@@ -14,6 +19,7 @@ local function ensure_source()
 				if filetype ~= 'dap-repl' and not filetype:match('^dapui_')
 					and vim.bo[buffer].buftype ~= 'terminal' and vim.api.nvim_win_get_config(win).relative == '' then
 					source = win
+					track(source)
 					return
 				end
 			end
@@ -23,6 +29,14 @@ local function ensure_source()
 			end)
 		end
 	end
+	track(source)
+end
+
+--- The debug tab's source window, created if needed; dap-ui routes pane
+--- navigation here through `select_window`.
+function M.source_window()
+	ensure_source()
+	return source
 end
 
 local function ensure()
@@ -76,18 +90,7 @@ end
 function M.reset()
 	ensure()
 	local repl = vim.bo.filetype == 'dap-repl' and vim.api.nvim_get_current_buf()
-	vim.api.nvim_win_call(source, function()
-		-- Upstream considers partially closed layouts open, then resizes stale window IDs.
-		for index, layout in ipairs(require('dapui.windows').layouts) do
-			for _, win in ipairs(layout.opened_wins) do
-				if not vim.api.nvim_win_is_valid(win) then
-					require('dapui').close({ layout = index })
-					require('dapui').open({ layout = index, reset = true })
-					break
-				end
-			end
-		end
-	end)
+	-- The dap-ui fork rebuilds layouts with hand-closed panes on open().
 	open({ reset = true })
 	if repl then
 		for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tab)) do

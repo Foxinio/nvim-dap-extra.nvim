@@ -46,6 +46,12 @@ dap.session = function() return { config = { type = 'cppdbg' } } end
 repl.execute = function(command) forwarded[#forwarded + 1] = command end
 repl.commands.custom_commands.gdb('info locals')
 assert(vim.deep_equal(forwarded, { '-exec info locals' }))
+local appended = {}
+local append = repl.append
+repl.append = function(text) appended[#appended + 1] = text end
+repl.commands.custom_commands.gdb('  ')
+repl.append = append
+assert(#forwarded == 1 and appended[1] == 'Usage: gdb <command>')
 assert(repl.commands.custom_commands.pn == nil)
 assert(vim.tbl_contains(repl.commands.into, 's') and vim.tbl_contains(repl.commands.out, 'fin'))
 repl.execute = execute
@@ -139,7 +145,7 @@ debug_ui.focus()
 assert(tab_names[debug_tab] == 'DEBUGGER')
 local target_session = { config = { program = '/work/build/my_app', name = 'Launch application' } }
 dap.session = function() return target_session end
-dap.listeners.after.event_initialized['dapui_config']()
+dap.listeners.after.event_initialized['dap-extra']()
 assert(tab_names[debug_tab] == 'DEBUGGER (my_app)')
 target_session.config = { program = '/work/build/other_app' }
 debug_ui.open()

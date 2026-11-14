@@ -32,7 +32,13 @@ function M.setup(opts)
 
 	-- Dap UI setup
 	-- For more information, see |:help nvim-dap-ui|
+	if not dapui.source_window then
+		vim.notify('nvim-dap-extra: pane navigation needs Foxinio/nvim-dap-ui (source_window API)', vim.log.levels.WARN)
+	end
 	dapui.setup(vim.tbl_deep_extend('force', {
+		-- Stacks/Breakpoints navigation goes to the debug tab's source window.
+		select_window = function() return require('dap-extra.ui').source_window() end,
+		source_window = { track = true, focus = true },
 		element_mappings = {
 			stacks = { expand = '<2-LeftMouse>', open = { '<CR>', 'o' }, toggle = { '<Space>', 't' } },
 			breakpoints = { expand = '<2-LeftMouse>', open = { '<CR>', 'o' }, toggle = 't', remove = 'd' },
@@ -77,7 +83,6 @@ function M.setup(opts)
 			},
 		},
 	}, opts.dapui or {}))
-	require('dap-extra.panes').setup()
 
 	vim.fn.sign_define('DapBreakpoint', { text = '🛑', texthl = '', linehl = '', numhl = '' })
 	vim.fn.sign_define('DapBreakpointCondition', { text = '🟨', texthl = '', linehl = '', numhl = '' })
@@ -89,7 +94,8 @@ function M.setup(opts)
 	local debug_ui = require('dap-extra.ui')
 	debug_ui.setup()
 	dap.defaults.fallback.switchbuf = debug_ui.jump
-	dap.listeners.after.event_initialized['dapui_config'] = function()
+	-- Not 'dapui_config': that is the key dap-ui's README suggests for user listeners.
+	dap.listeners.after.event_initialized['dap-extra'] = function()
 		debug_ui.open()
 		for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
 			if vim.bo[vim.api.nvim_win_get_buf(win)].filetype == 'dap-repl' then

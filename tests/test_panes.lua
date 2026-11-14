@@ -5,14 +5,8 @@ dap.session = function() return stopped end
 local ui = require('dap-extra.ui')
 local breakpoints = require('dap.breakpoints')
 require('dap-extra').setup()
-require('dap-extra.panes').setup()
-local util = require('dapui.util')
-local open_buf, render_before = util.open_buf, dapui.elements.breakpoints.render
+assert(dapui.source_window, 'Tests need the Foxinio/nvim-dap-ui fork')
 local hover = require('dapui.render.line_hover')
-local show_line = hover.show
-require('dap-extra.panes').setup()
-assert(util.open_buf == open_buf and dapui.elements.breakpoints.render == render_before)
-assert(hover.show == show_line, 'Repeated setup wrapped line hovers again')
 dap.defaults.fallback.switchbuf = ui.jump
 vim.cmd.edit(root .. '/tests/test_panes.lua')
 local buffer = vim.api.nvim_get_current_buf()

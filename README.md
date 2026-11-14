@@ -10,7 +10,7 @@ and cleanup. Requires Neovim 0.11+.
   'Foxinio/nvim-dap-extra.nvim',
   lazy = false,
   dependencies = {
-    'mfussenegger/nvim-dap', 'rcarriga/nvim-dap-ui',
+    'mfussenegger/nvim-dap', 'Foxinio/nvim-dap-ui', -- fork: source_window routing
     'nvim-neotest/nvim-nio', 'theHamsta/nvim-dap-virtual-text',
   },
   opts = { dapui = {}, virtual_text = {} },
@@ -129,14 +129,12 @@ DAP, keeping them synchronized. Relative moves stop at the ends of the stack.
 ## Checks
 
 ```sh
-nvim --headless -u NONE -i NONE -l tests/test.lua
-nvim --headless -u NONE -i NONE -l tests/test_panes.lua
-nvim --headless -u NONE -i NONE -l tests/test_controls.lua
-nvim --headless -u NONE -i NONE -l tests/test_focus_live.lua
-nvim --headless -u NONE -i NONE -l tests/test_exceptions_live.lua
+make test       # test.lua, test_panes.lua, test_controls.lua
+make test-live  # test_focus_live.lua, test_exceptions_live.lua
 ```
 
 Run from this plugin directory. Tests use only declared dependencies in
-Neovim's data/lazy (`NVIM_TEST_DEPENDENCIES` overrides the parent directory)
-and change to an unrelated cwd. The live suites need cc, c++, GDB, ptrace and
-OpenDebugAD7 in Neovim's data/mason/bin.
+Neovim's data/lazy (`DEPS_DIR` or `NVIM_TEST_DEPENDENCIES` overrides the parent
+directory; `make deps test DEPS_DIR=.deps` clones them, as CI does) and change
+to an unrelated cwd. The live suites need cc, c++, GDB, ptrace and OpenDebugAD7
+in Neovim's data/mason/bin.
