@@ -68,9 +68,11 @@ or the configuration name when no program path is available. Before a session
 starts it is named `DEBUGGER`; the last target label stays after the session ends.
 No additional setup is needed, and Tabby is not installed automatically.
 
-Use `:DapReset` to restore configured debugger pane sizes and reopen missing
-panes without interrupting debugging. It uses the existing debug tab and does
-not reconstruct manually rearranged splits.
+Use `:DapRestoreLayout` to put the debugger panes back the way a session opens
+them, without interrupting debugging: every pane at its configured position and
+size, showing its own content, after panes were resized, closed, moved or given
+another buffer. It works in the debug tab and keeps your own splits there. The
+cursor stays where it was (the REPL keeps focus).
 
 Use `:DapClean` to terminate debugging, clear inline debugger annotations and
 cached values, and close debugger panes and the REPL, even after a session has
