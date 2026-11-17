@@ -87,11 +87,18 @@ function M.open()
 	open()
 end
 
-function M.reset()
+--- Put the debugger panes back as a session opens them (positions, sizes and
+--- buffers) in the debug tab, keeping the user's own splits.
+function M.restore_layout()
 	ensure()
 	local repl = vim.bo.filetype == 'dap-repl' and vim.api.nvim_get_current_buf()
-	-- The dap-ui fork rebuilds layouts with hand-closed panes on open().
-	open({ reset = true })
+	if not repl then M.focus() end
+	local dapui = require('dapui')
+	if dapui.restore_layout then
+		dapui.restore_layout()
+	else
+		dapui.open({ reset = true })
+	end
 	if repl then
 		for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tab)) do
 			if vim.api.nvim_win_get_buf(win) == repl then vim.api.nvim_set_current_win(win); break end
@@ -120,8 +127,9 @@ function M.cleanup()
 end
 
 function M.setup()
-	vim.api.nvim_create_user_command('DapReset', M.reset, {
-		force = true, desc = 'Restore configured debugger pane sizes',
+	-- Replaces dap-ui's generic command with the debug-tab-aware one.
+	vim.api.nvim_create_user_command('DapRestoreLayout', M.restore_layout, {
+		force = true, desc = 'Restore debugger panes to their configured positions and sizes',
 	})
 	vim.api.nvim_create_user_command('DapClean', M.cleanup, {
 		force = true, desc = 'Terminate debugging, clear annotations and close debugger panes',
