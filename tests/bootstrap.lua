@@ -5,10 +5,20 @@ local dependencies = vim.env.NVIM_TEST_DEPENDENCIES or vim.env.DEPS_DIR
 if not dependencies or dependencies == '' then dependencies = vim.fn.stdpath('data') .. '/lazy' end
 -- Absolute: the tests change directory to /tmp below.
 dependencies = vim.fn.fnamemodify(dependencies, ':p'):gsub('/$', '')
-for _, name in ipairs({ 'nvim-dap', 'nvim-dap-ui', 'nvim-nio', 'nvim-dap-virtual-text' }) do
-	local path = dependencies .. '/' .. name
-	assert(vim.fn.isdirectory(path) == 1, 'Missing test dependency: ' .. path)
-	vim.opt.rtp:append(path)
+local function add(names)
+	for _, name in ipairs(names) do
+		local path = dependencies .. '/' .. name
+		assert(vim.fn.isdirectory(path) == 1, 'Missing test dependency: ' .. path)
+		vim.opt.rtp:append(path)
+	end
+end
+add({ 'nvim-dap', 'nvim-dap-virtual-text' })
+
+--- Live/integration scripts also load the Foxinio/nvim-dap-ui fork (debug tab,
+--- panes); the unit tests check dap-extra works without it.
+function M.with_dapui()
+	add({ 'nvim-dap-ui', 'nvim-nio' })
+	require('dapui').setup()
 end
 vim.cmd.cd('/tmp')
 return M

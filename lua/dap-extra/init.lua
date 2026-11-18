@@ -4,7 +4,7 @@ local configured = false
 function M.setup(opts)
 	if configured then return end
 	opts = opts or {}
-	local dap, dapui = require('dap'), require('dapui')
+	local dap = require('dap')
 	dap.listeners.on_config['dap-extra'] = function(config)
 		if config.type ~= 'cppdbg' or (config.MIMode and config.MIMode ~= 'gdb') then return config end
 		config = vim.deepcopy(config)
@@ -30,60 +30,6 @@ function M.setup(opts)
 		clear_on_continue = false,
 	}, opts.virtual_text or {}))
 
-	-- Dap UI setup
-	-- For more information, see |:help nvim-dap-ui|
-	if not dapui.source_window then
-		vim.notify('nvim-dap-extra: pane navigation needs Foxinio/nvim-dap-ui (source_window API)', vim.log.levels.WARN)
-	end
-	dapui.setup(vim.tbl_deep_extend('force', {
-		-- Stacks/Breakpoints navigation goes to the debug tab's source window.
-		select_window = function() return require('dap-extra.ui').source_window() end,
-		source_window = { track = true, focus = true },
-		element_mappings = {
-			stacks = { expand = '<2-LeftMouse>', open = { '<CR>', 'o' }, toggle = { '<Space>', 't' } },
-			breakpoints = { expand = '<2-LeftMouse>', open = { '<CR>', 'o' }, toggle = 't', remove = 'd' },
-		},
-		icons = { expanded = '▾', collapsed = '▸', current_frame = '*' },
-		layouts = {
-			{
-				elements = {
-					{ id = 'scopes', size = 0.45 },
-					{ id = 'breakpoints', size = 0.15 },
-					{ id = 'stacks', size = 0.25 },
-					{ id = 'watches', size = 0.15 },
-				},
-				position = 'left',
-				size = 48,
-			},
-			{
-				elements = {
-					{ id = 'repl', size = 0.5 },
-					{ id = 'console', size = 0.5 },
-				},
-				position = 'bottom',
-				size = 12,
-			},
-		},
-		floating = {
-			border = 'rounded',
-		},
-		controls = {
-			enabled = true,
-			element = 'repl',
-			icons = {
-				pause = '⏸',
-				play = '▶',
-				step_into = '⏎',
-				step_over = '⏭',
-				step_out = '⏮',
-				step_back = 'b',
-				run_last = '▶▶',
-				terminate = '⏹',
-				disconnect = '⏏',
-			},
-		},
-	}, opts.dapui or {}))
-
 	vim.fn.sign_define('DapBreakpoint', { text = '🛑', texthl = '', linehl = '', numhl = '' })
 	vim.fn.sign_define('DapBreakpointCondition', { text = '🟨', texthl = '', linehl = '', numhl = '' })
 	vim.fn.sign_define('DapLogPoint', { text = '📝', texthl = '', linehl = '', numhl = '' })
@@ -91,21 +37,34 @@ function M.setup(opts)
 	vim.fn.sign_define('DapBreakpointRejected', { text = '', texthl = 'DiagnosticError', linehl = '', numhl = '' })
 
 	require('dap-extra.repl').setup()
-	local debug_ui = require('dap-extra.ui')
-	debug_ui.setup()
-	dap.defaults.fallback.switchbuf = debug_ui.jump
-	-- Not 'dapui_config': that is the key dap-ui's README suggests for user listeners.
-	dap.listeners.after.event_initialized['dap-extra'] = function()
-		debug_ui.open()
-		for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-			if vim.bo[vim.api.nvim_win_get_buf(win)].filetype == 'dap-repl' then
-				vim.api.nvim_set_current_win(win)
-				vim.cmd.startinsert({ bang = true })
-				break
-			end
+	configured = true
+end
+
+--- Show the selected frame's source in the current window (file or adapter
+--- source), without changing windows, tabs or the selected frame.
+function M.local_frame()
+	local session = require('dap').session()
+	local frame = session and session.current_frame
+	local location = frame and frame.source
+	if not location or not frame.line or frame.line < 1
+		or (not location.path and (location.sourceReference or 0) == 0) then
+		vim.notify('Selected frame source is unavailable', vim.log.levels.INFO)
+		return
+	end
+	local name
+	if (location.sourceReference or 0) ~= 0 then
+		name = string.format('dap-src://%d/%d/%s', session.id, location.sourceReference, location.path or '')
+	else
+		name = location.path
+		if not name:match('^%a+://') and vim.fn.filereadable(name) == 0 then
+			vim.notify('Selected frame source is unavailable', vim.log.levels.INFO)
+			return
 		end
 	end
-	configured = true
+	local buffer = vim.fn.bufadd(name)
+	vim.fn.bufload(buffer)
+	vim.api.nvim_win_set_buf(0, buffer)
+	vim.api.nvim_win_set_cursor(0, { frame.line, math.max(0, (frame.column or 1) - 1) })
 end
 
 return M

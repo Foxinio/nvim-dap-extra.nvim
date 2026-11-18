@@ -1,7 +1,14 @@
 # nvim-dap-extra.nvim
 
-Reusable DAP tab/source routing, REPL history and frame commands, pane bindings,
-and cleanup. Requires Neovim 0.11+.
+Extras for [nvim-dap](https://github.com/mfussenegger/nvim-dap): GDB-style REPL
+commands with prefix history, stack navigation commands, cppdbg defaults,
+nvim-dap-virtual-text and sign setup, and showing the selected frame in the
+current window. Requires Neovim 0.11+. It does not need nvim-dap-ui.
+
+The debugger UI parts that used to live here (the dedicated debug tab, source
+routing, pane bindings, `:DapRestoreLayout`, `:DapClean`) are now part of the
+[Foxinio/nvim-dap-ui](https://github.com/Foxinio/nvim-dap-ui) fork
+(`:help dapui.debug_tab`).
 
 ## Installation
 
@@ -9,21 +16,16 @@ and cleanup. Requires Neovim 0.11+.
 {
   'Foxinio/nvim-dap-extra.nvim',
   lazy = false,
-  dependencies = {
-    'mfussenegger/nvim-dap', 'Foxinio/nvim-dap-ui', -- fork: source_window routing
-    'nvim-neotest/nvim-nio', 'theHamsta/nvim-dap-virtual-text',
-  },
-  opts = { dapui = {}, virtual_text = {} },
+  dependencies = { 'mfussenegger/nvim-dap', 'theHamsta/nvim-dap-virtual-text' },
+  opts = { virtual_text = {} },
 }
 ```
 
-`require('dap-extra').setup(opts)` merges `dapui` and `virtual_text` tables
-over the bundled UI defaults. Setup may be repeated; listeners, commands,
-history hooks and compatibility patches do not stack. Repeated calls leave the
-existing configuration in place. Adapter registration,
-language configurations, Mason, and global mappings belong to the caller.
-Only generic GDB REPL shortcuts need a GDB/cppdbg session; loading the plugin
-does not require GDB or an adapter.
+`require('dap-extra').setup(opts)` merges `virtual_text` over the bundled
+nvim-dap-virtual-text defaults. Setup may be repeated; listeners, commands and
+history hooks do not stack. Adapter registration, language configurations,
+Mason, dap-ui and global mappings belong to the caller. Only the GDB REPL
+shortcuts need a GDB/cppdbg session.
 
 For `cppdbg` sessions with `MIMode = 'gdb'` (or omitted), setup automatically
 adds `catch throw`,
@@ -34,64 +36,19 @@ signals before delivery, including assertion failures that call `abort()`.
 Continuing delivers the signal and may terminate the program. Existing
 `setupCommands` run afterward and can override signal handling. Other adapters
 and explicit LLDB sessions are unchanged. Every `pthread_kill` call stops,
-including calls sending harmless signals. Missing library source files do not
-prevent the Stacks pane from refreshing to the current stop.
+including calls sending harmless signals.
 
-## UI helpers
+## Selected frame here
 
 ```lua
-local ui = require('dap-extra.ui')
--- Bind these in your own configuration, after loading the plugin:
-vim.keymap.set('n', '<F5>', ui.action(function() require('dap').continue() end))
-vim.keymap.set('n', '<leader>dg', ui.local_frame)
+vim.keymap.set('n', '<leader>dg', require('dap-extra').local_frame)
 ```
 
-`action(callback, use_cursor)` routes to a shared debug tab and forwards all
-arguments. Set `use_cursor` for source-sensitive actions such as run-to-cursor.
-`focus()`, `toggle()`, `repl()`, `open()`, `close()`, `jump(buf, line, column)`,
-`local_frame()`, `reset()`, and `cleanup()` remain available. Columns passed to `jump`
-are one-based. Local frame navigation preserves the selected frame and splits.
+`local_frame()` shows the selected frame's source in the current window, for
+files and adapter-provided sources, without changing windows, tabs or the
+selected frame. A missing source is reported and nothing moves.
 
-The debugger uses one dedicated tab across sessions. Actions wrapped with
-`action()`, stack and breakpoint source selection, and pane toggles switch to
-that tab. `action(callback, true)` retains the invoking file and cursor;
-wrapped actions use the invoking cwd. Bind breakpoint editing and value hover
-directly to nvim-dap to keep them in the invoking window and tab.
-Use `gt` / `gT` to switch between tabs. Debugger panes stay open after the
-program exits or debugging stops, so final output remains available. Use
-`:DapClean` to close them explicitly.
-Starting a debug session focuses the REPL in insert mode, ready for commands.
-
-If optional [Tabby.nvim](https://github.com/nanozuki/tabby.nvim) is available,
-the debug tab is named `DEBUGGER (my_app)` using the resolved program filename,
-or the configuration name when no program path is available. Before a session
-starts it is named `DEBUGGER`; the last target label stays after the session ends.
-No additional setup is needed, and Tabby is not installed automatically.
-
-Use `:DapRestoreLayout` to put the debugger panes back the way a session opens
-them, without interrupting debugging: every pane at its configured position and
-size, showing its own content, after panes were resized, closed, moved or given
-another buffer. It works in the debug tab and keeps your own splits there. The
-cursor stays where it was (the REPL keeps focus).
-
-Use `:DapClean` to terminate debugging, clear inline debugger annotations and
-cached values, and close debugger panes and the REPL, even after a session has
-already ended. It preserves the source tab, file buffers and breakpoints. Use
-`:tabclose` afterward if you also want to close that tab.
-
-The optional mappings above bind `<F5>` to continue and `<leader>dg` to show
-the selected frame in the invoking window, preserving splits and frame
-selection, including adapter-provided sources. The plugin installs no global
-keymaps.
-
-In Stacks, Enter or `o` selects the frame and focuses its source in the existing
-debug source pane; Space or `t` toggles subtle frames for the thread. In
-Breakpoints, Enter or `o` focuses the breakpoint's source without changing frame
-selection, `t` enables/disables it, and `d` removes it (including disabled entries).
-These bindings are buffer-local.
-
-Long-line hovers remain visible and pass mouse input through to the pane below,
-so a hover appearing during a click cannot turn its release into a selection.
+## REPL
 
 The REPL accepts `s`, `n`, `si`, `ni`, `fin`, `c`, `p expression`, `i locals`,
 and `gdb arbitrary-command`.
@@ -101,21 +58,13 @@ run yet, nvim-dap reports that no configuration is available to rerun.
 
 Use `q` or `quit` to terminate the current debug session asynchronously. Wait
 for the `Debugging stopped` notification before closing the debug tab. These
-commands request termination even for attached programs, without invoking
-`:DapClean`; debugger panes remain open. With no active session they report
+commands request termination even for attached programs; debugger panes remain
+open. With no active session they report
 `No active debug session`. Process termination depends on
 the adapter honoring the request.
 
-The Console uses Neovim's integrated terminal. Long output can be split into
-terminal rows even with `nowrap`, and resizing does not repair old scrollback.
-See the [Console wrapping investigation](docs/console-wrapping.md) for a
-reproduction and follow-up recommendation.
-
-Multiline definitions
-belong in startup commands; this pane is a DAP REPL, not an interactive terminal.
-REPL commands and subsequent stops update the debug source and variables without
-taking focus or leaving REPL input mode. Moving elsewhere during execution is
-respected; source-window stack bindings focus the debug source normally.
+Multiline definitions belong in startup commands; this is a DAP REPL, not an
+interactive terminal.
 
 In insert mode, Up/Down search commands submitted with Enter using the text
 you have typed as a prefix. Empty input browses all commands. Down past the
@@ -127,12 +76,11 @@ frame. `bt [n]`, `backtrace [n]` and `where [n]` list numbered frames, optionall
 limited to the first n. Frame selection updates the source and variables through
 DAP, keeping them synchronized. Relative moves stop at the ends of the stack.
 
-
 ## Checks
 
 ```sh
-make test       # test.lua, test_panes.lua, test_controls.lua
-make test-live  # test_focus_live.lua, test_exceptions_live.lua
+make test       # test.lua, test_controls.lua (nvim-dap only)
+make test-live  # test_focus_live.lua, test_exceptions_live.lua (also need the dap-ui fork: make deps-live)
 ```
 
 Run from this plugin directory. Tests use only declared dependencies in

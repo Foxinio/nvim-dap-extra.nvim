@@ -1,6 +1,6 @@
-dofile(vim.fs.dirname(debug.getinfo(1, 'S').source:sub(2)) .. '/bootstrap.lua')
+dofile(vim.fs.dirname(debug.getinfo(1, 'S').source:sub(2)) .. '/bootstrap.lua').with_dapui()
 require('dap-extra').setup()
-require('dap-extra.ui').open()
+require('dapui').open()
 local buffer = require('dapui').elements.console.buffer()
 local win
 for _, candidate in ipairs(vim.api.nvim_tabpage_list_wins(0)) do

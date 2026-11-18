@@ -1,8 +1,7 @@
 local root = dofile(vim.fs.dirname(debug.getinfo(1, 'S').source:sub(2)) .. '/bootstrap.lua').root
 local dap, repl = require('dap'), require('dap.repl')
-require('dap-extra').setup({ dapui = { floating = { border = 'single' } } })
-assert(require('dapui.config').floating.border == 'single')
-assert(require('dapui.config').icons.current_frame == '*')
+require('dap-extra').setup()
+assert(not package.loaded.dapui, 'dap-extra must not load dap-ui')
 local function listener_count()
 	local count = 0
 	for _, when in ipairs({ dap.listeners.before, dap.listeners.after }) do
@@ -13,10 +12,9 @@ local function listener_count()
 	return count
 end
 local listeners = listener_count()
-local render = require('dapui').elements.breakpoints.render
 vim.wait(20, function() return false end)
 require('dap-extra').setup()
-assert(listener_count() == listeners and require('dapui').elements.breakpoints.render == render)
+assert(listener_count() == listeners, 'Repeated setup added listeners')
 local configure = dap.listeners.on_config['dap-extra']
 local defaults = {
 	{ text = 'catch throw' },
@@ -117,204 +115,22 @@ typed(''); key('<Up>'); assert(line() == 'dap> p node->name()')
 vim.api.nvim_set_current_buf(original_buffer)
 vim.api.nvim_buf_delete(prompt_buffer, { force = true })
 
-local function action(callback, cursor) return require('dap-extra.ui').action(callback, cursor) end
-local mappings = {
-	['<F10>'] = action(function() dap.step_over() end),
-	['<leader>b'] = function() dap.toggle_breakpoint() end,
-	['<leader>B'] = function() dap.set_breakpoint(vim.fn.input('Condition: ')) end,
-	['<leader>dK'] = function() require('dap.ui.widgets').hover() end,
-	['<leader>dg'] = function() require('dap-extra.ui').local_frame() end,
-	['<leader>dl'] = action(function() dap.run_to_cursor() end, true),
-}
--- Debug panes and source jumps must leave the original tab's windows intact.
-local debug_ui = require('dap-extra.ui')
+-- local_frame shows the selected frame in the current window only.
 vim.cmd('vsplit')
-local original_tab = vim.api.nvim_get_current_tabpage()
-local original_layout = vim.fn.winlayout()
-local original_buffers = vim.tbl_map(vim.api.nvim_win_get_buf, vim.api.nvim_tabpage_list_wins(original_tab))
-local tab_count = #vim.api.nvim_list_tabpages()
-debug_ui.open()
-local debug_tab = vim.api.nvim_get_current_tabpage()
-assert(debug_tab ~= original_tab and #vim.api.nvim_list_tabpages() == tab_count + 1)
-local tab_names = {}
-package.loaded['tabby.feature.tab_name'] = {
-	set = function(tab, name) tab_names[tab] = name end,
-	get_raw = function(tab) return tab_names[tab] or '' end,
-}
-debug_ui.focus()
-assert(tab_names[debug_tab] == 'DEBUGGER')
-local target_session = { config = { program = '/work/build/my_app', name = 'Launch application' } }
-dap.session = function() return target_session end
-dap.listeners.after.event_initialized['dap-extra']()
-assert(tab_names[debug_tab] == 'DEBUGGER (my_app)')
-target_session.config = { program = '/work/build/other_app' }
-debug_ui.open()
-assert(tab_names[debug_tab] == 'DEBUGGER (other_app)')
-for _, program in ipairs({ '', false, function() return '/unresolved' end }) do
-	target_session.config = { program = program, name = 'Attach to application' }
-	debug_ui.focus()
-	assert(tab_names[debug_tab] == 'DEBUGGER (Attach to application)')
-end
-target_session.config = {}
-debug_ui.focus()
-assert(tab_names[debug_tab] == 'DEBUGGER')
-target_session.config = { program = '/work/build/my_app' }
-debug_ui.focus()
-dap.session = session
-debug_ui.focus()
-assert(tab_names[debug_tab] == 'DEBUGGER (my_app)', 'Preserve the target after session exit')
-assert(tab_names[original_tab] == nil, 'Only rename the debugger tab')
-debug_ui.open()
-assert(#vim.api.nvim_list_tabpages() == tab_count + 1, 'Reuse the debugger tab')
-vim.api.nvim_set_current_tabpage(original_tab)
-local called = false
-debug_ui.action(function(value)
-	called = value
-	assert(vim.api.nvim_get_current_tabpage() == debug_tab)
-end)('forwarded')
-assert(called == 'forwarded' and #vim.api.nvim_list_tabpages() == tab_count + 1)
-local step_over = dap.step_over
-dap.step_over = function() assert(vim.api.nvim_get_current_tabpage() == debug_tab) end
-vim.api.nvim_set_current_tabpage(original_tab)
-mappings['<F10>']()
-dap.step_over = step_over
-vim.api.nvim_set_current_tabpage(original_tab)
-local origin_buffer = vim.api.nvim_get_current_buf()
-local origin_cursor = vim.api.nvim_win_get_cursor(0)
-debug_ui.action(function()
-	assert(vim.api.nvim_get_current_tabpage() == debug_tab)
-	assert(vim.api.nvim_get_current_buf() == origin_buffer)
-	assert(vim.deep_equal(vim.api.nvim_win_get_cursor(0), origin_cursor))
-end, true)()
-vim.api.nvim_set_current_tabpage(original_tab)
-local target = vim.api.nvim_create_buf(false, true)
-vim.api.nvim_buf_set_lines(target, 0, -1, false, { 'first', 'second' })
-debug_ui.jump(target, 2, 1)
-assert(vim.api.nvim_get_current_tabpage() == debug_tab and vim.api.nvim_get_current_buf() == target)
-debug_ui.jump(target, 1000, 1)
-assert(vim.api.nvim_win_get_cursor(0)[1] == 2, 'Unavailable source line interrupted the source jump')
-debug_ui.jump(target, 0, 1)
-assert(vim.api.nvim_win_get_cursor(0)[1] == 1)
-vim.api.nvim_set_current_tabpage(original_tab)
-debug_ui.close()
-assert(vim.api.nvim_get_current_tabpage() == original_tab)
-assert(vim.deep_equal(vim.fn.winlayout(), original_layout))
-assert(vim.deep_equal(vim.tbl_map(vim.api.nvim_win_get_buf, vim.api.nvim_tabpage_list_wins(original_tab)), original_buffers))
-local invoking = vim.api.nvim_get_current_win()
-local toggle_breakpoint, set_breakpoint = dap.toggle_breakpoint, dap.set_breakpoint
-local widgets = require('dap.ui.widgets')
-local hover, input = widgets.hover, vim.fn.input
-local local_calls = 0
-local function local_action()
-	local_calls = local_calls + 1
-	assert(vim.api.nvim_get_current_win() == invoking)
-	assert(vim.deep_equal(vim.fn.winlayout(), original_layout))
-	assert(vim.deep_equal(vim.api.nvim_win_get_cursor(0), origin_cursor))
-end
-dap.toggle_breakpoint, dap.set_breakpoint, widgets.hover = local_action, local_action, local_action
-vim.fn.input = function() return '' end
-for _, key in ipairs({ '<leader>b', '<leader>B', '<leader>dK' }) do mappings[key]() end
-assert(local_calls == 3)
-dap.toggle_breakpoint, dap.set_breakpoint, widgets.hover, vim.fn.input = toggle_breakpoint, set_breakpoint, hover, input
-
+local invoking, layout = vim.api.nvim_get_current_win(), vim.fn.winlayout()
 local selected = { id = 9, source = { path = root .. '/tests/test.lua' }, line = 2, column = 1 }
 dap.session = function() return { id = 1, current_frame = selected } end
-mappings['<leader>dg']()
-assert(vim.api.nvim_get_current_win() == invoking and vim.deep_equal(vim.fn.winlayout(), original_layout))
+require('dap-extra').local_frame()
+assert(vim.api.nvim_get_current_win() == invoking and vim.deep_equal(vim.fn.winlayout(), layout))
 assert(vim.api.nvim_buf_get_name(0) == selected.source.path and vim.api.nvim_win_get_cursor(0)[1] == 2)
-assert(dap.session().current_frame == selected)
+assert(dap.session().current_frame == selected, 'local_frame must not change the selected frame')
 selected.source = { sourceReference = 10 }
 local adapter_buffer = vim.fn.bufadd('dap-src://1/10/')
 vim.api.nvim_buf_set_lines(adapter_buffer, 0, -1, false, { 'adapter', 'source' })
-mappings['<leader>dg']()
+require('dap-extra').local_frame()
 assert(vim.api.nvim_get_current_buf() == adapter_buffer)
 selected.source = nil
-mappings['<leader>dg']()
-assert(vim.api.nvim_get_current_buf() == adapter_buffer)
+require('dap-extra').local_frame()
+assert(vim.api.nvim_get_current_buf() == adapter_buffer, 'Missing source keeps the window')
 dap.session = session
-vim.api.nvim_win_set_buf(invoking, origin_buffer)
-
-vim.api.nvim_set_current_win(invoking)
-local run_to_cursor = dap.run_to_cursor
-dap.run_to_cursor = function()
-	assert(vim.api.nvim_get_current_tabpage() == debug_tab)
-	assert(vim.api.nvim_get_current_buf() == origin_buffer)
-end
-mappings['<leader>dl']()
-dap.run_to_cursor = run_to_cursor
-debug_ui.open()
-local source_win = vim.api.nvim_get_current_win()
-dap.repl.open()
-for _, win in ipairs(vim.api.nvim_tabpage_list_wins(debug_tab)) do
-	if vim.bo[vim.api.nvim_win_get_buf(win)].filetype == 'dap-repl' then vim.api.nvim_set_current_win(win); break end
-end
-local repl_win = vim.api.nvim_get_current_win()
-assert(vim.bo.filetype == 'dap-repl')
-local function automatic_update()
-	debug_ui.jump(target, 2, 1)
-	assert(vim.api.nvim_get_current_win() == repl_win)
-	assert(vim.api.nvim_win_get_buf(source_win) == target)
-end
-automatic_update()
-stopped._frame_set = function(self, frame)
-	self.current_frame = frame
-	debug_ui.jump(target, 2, 1)
-end
-dap.session = function() return stopped end
-commands.frame('0')
-assert(stopped.current_frame == frames[1] and vim.api.nvim_get_current_win() == repl_win)
-dap.session = session
-debug_ui.open()
-assert(vim.api.nvim_get_current_win() == repl_win)
-vim.schedule(automatic_update)
-vim.wait(50, function() return false end)
-vim.api.nvim_set_current_win(invoking)
-vim.schedule(function() debug_ui.jump(target, 1, 1) end)
-vim.wait(50, function() return false end)
-assert(vim.api.nvim_get_current_win() == source_win, 'Source actions must not restore old REPL focus')
-vim.api.nvim_set_current_tabpage(debug_tab)
-vim.cmd('tabclose')
-debug_ui.open()
-assert(vim.api.nvim_get_current_tabpage() ~= original_tab, 'Recreate a manually closed debugger tab')
-assert(tab_names[vim.api.nvim_get_current_tabpage()] == 'DEBUGGER', 'Name the recreated debugger tab')
-package.loaded['tabby.feature.tab_name'] = nil
-debug_ui.close()
-debug_ui.setup()
-local terminate, pending = dap.terminate, nil
-local virtual_text = require('nvim-dap-virtual-text/virtual_text')
-local namespace = vim.api.nvim_create_namespace('debug-cleanup-test')
-local clear_text, clear_frames = virtual_text.clear_virtual_text, virtual_text.clear_last_frames
-local clears = 0
-virtual_text.clear_virtual_text = function()
-	clears = clears + 1
-	vim.api.nvim_buf_clear_namespace(target, namespace, 0, -1)
-end
-virtual_text.clear_last_frames = function() end
-dap.terminate = function(options) pending = options.on_done end
-debug_ui.open()
-local cleanup_tab = vim.api.nvim_get_current_tabpage()
-local breakpoint_count = vim.deepcopy(require('dap.breakpoints').get())
-vim.api.nvim_buf_set_extmark(target, namespace, 0, 0, { virt_text = { { 'stale value' } } })
-vim.api.nvim_set_current_win(invoking)
-vim.cmd('DapClean')
-assert(vim.api.nvim_get_current_win() == invoking)
-assert(vim.api.nvim_tabpage_is_valid(cleanup_tab))
-assert(#vim.api.nvim_tabpage_list_wins(cleanup_tab) == 1)
-assert(#vim.api.nvim_buf_get_extmarks(target, namespace, 0, -1, {}) == 0)
-assert(vim.deep_equal(require('dap.breakpoints').get(), breakpoint_count))
-assert(clears == 1 and pending)
-pending()
-dap.terminate = function() end
-vim.cmd('DapClean')
-assert(clears == 3 and vim.api.nvim_get_current_win() == invoking)
-dap.terminate = terminate
-virtual_text.clear_virtual_text, virtual_text.clear_last_frames = clear_text, clear_frames
-debug_ui.focus()
-local old_source, existing_tab = vim.api.nvim_get_current_win(), vim.api.nvim_get_current_tabpage()
-vim.cmd.vsplit()
-local surviving = vim.api.nvim_get_current_win()
-vim.api.nvim_win_close(old_source, true)
-debug_ui.focus()
-assert(vim.api.nvim_get_current_tabpage() == existing_tab)
-assert(vim.api.nvim_get_current_win() == surviving, 'Reuse a surviving source window in the same tab')
-print('Standalone debugger routing, REPL, cleanup and repeated setup checks passed')
+print('REPL commands, history, cppdbg defaults, local frame and repeated setup checks passed')

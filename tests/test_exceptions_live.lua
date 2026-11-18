@@ -1,4 +1,4 @@
-dofile(vim.fs.dirname(debug.getinfo(1, 'S').source:sub(2)) .. '/bootstrap.lua')
+dofile(vim.fs.dirname(debug.getinfo(1, 'S').source:sub(2)) .. '/bootstrap.lua').with_dapui()
 local dap = require('dap')
 require('dap-extra').setup()
 dap.adapters.cppdbg = {
