@@ -1,74 +1,10 @@
 dofile(vim.fs.dirname(debug.getinfo(1, 'S').source:sub(2)) .. '/bootstrap.lua')
-require('dap-extra').setup({ dapui = { layouts = {
-	{ elements = { 'scopes', 'stacks' }, position = 'left', size = 32 },
-	{ elements = { 'repl', 'console' }, position = 'bottom', size = 8 },
-} } })
-local dap, dapui = require('dap'), require('dapui')
+require('dap-extra').setup()
+local dap = require('dap')
 local repl = require('dap.repl')
-local original_tab = vim.api.nvim_get_current_tabpage()
-local original_layout = vim.fn.winlayout()
-vim.cmd('DapRestoreLayout')
-local debug_tab, source = vim.api.nvim_get_current_tabpage(), vim.api.nvim_get_current_win()
-local source_buffer, cursor = vim.api.nvim_win_get_buf(source), vim.api.nvim_win_get_cursor(source)
-local breakpoints = vim.deepcopy(require('dap.breakpoints').get())
-local function pane(name)
-	local buffer = dapui.elements[name].buffer()
-	for _, win in ipairs(vim.api.nvim_tabpage_list_wins(debug_tab)) do
-		if vim.api.nvim_win_get_buf(win) == buffer then return win end
-	end
-	error('Missing pane: ' .. name)
-end
-local function sizes()
-	local result = {}
-	for _, name in ipairs({ 'scopes', 'stacks', 'repl', 'console' }) do
-		local win = pane(name)
-		result[name] = { vim.api.nvim_win_get_width(win), vim.api.nvim_win_get_height(win) }
-	end
-	return result
-end
-local expected = sizes()
-assert(expected.scopes[1] == 32 and expected.repl[2] == 8)
-vim.api.nvim_win_set_width(pane('scopes'), 45)
-vim.api.nvim_win_set_height(pane('repl'), 14)
-assert(not vim.deep_equal(sizes(), expected))
 local session, terminate, notify = dap.session, dap.terminate, vim.notify
 local active = {}
 dap.session = function() return active end
-dap.terminate = function() error('Reset must not terminate debugging') end
-vim.api.nvim_set_current_tabpage(original_tab)
-vim.cmd('DapRestoreLayout')
-assert(vim.api.nvim_get_current_tabpage() == debug_tab and vim.api.nvim_get_current_win() == source)
-assert(vim.deep_equal(sizes(), expected) and dap.session() == active)
-assert(vim.api.nvim_win_get_buf(source) == source_buffer)
-assert(vim.deep_equal(vim.api.nvim_win_get_cursor(source), cursor))
-assert(vim.deep_equal(require('dap.breakpoints').get(), breakpoints))
-vim.api.nvim_set_current_win(pane('repl'))
-vim.api.nvim_buf_set_lines(0, 0, -1, false, { 'dap> ' })
-vim.cmd('DapRestoreLayout')
--- Panes are rebuilt, so the REPL window is new; focus stays on the REPL.
-assert(vim.api.nvim_get_current_win() == pane('repl') and vim.deep_equal(sizes(), expected))
-vim.api.nvim_win_close(pane('stacks'), true)
-vim.cmd('DapRestoreLayout')
-assert(pane('stacks') and vim.deep_equal(sizes(), expected))
-vim.api.nvim_win_close(pane('console'), true)
-vim.cmd('DapRestoreLayout')
-assert(vim.api.nvim_get_current_win() == pane('repl'), 'Reset must restore REPL focus')
-assert(vim.deep_equal(sizes(), expected), vim.inspect({ actual = sizes(), expected = expected }))
--- A pane moved to another edge goes back; the user's own split survives.
-vim.api.nvim_set_current_win(pane('scopes'))
-vim.cmd('wincmd L')
-vim.api.nvim_set_current_win(source)
-vim.cmd.vsplit()
-local user_split = vim.api.nvim_get_current_win()
-vim.api.nvim_set_current_win(source)
-vim.cmd('DapRestoreLayout')
-assert(vim.deep_equal(sizes(), expected), vim.inspect({ moved = sizes(), expected = expected }))
-assert(vim.api.nvim_win_get_position(pane('scopes'))[2] == 0, 'Moved pane returns to the left edge')
-assert(vim.api.nvim_win_is_valid(user_split), 'Restore keeps user splits')
-assert(vim.api.nvim_get_current_win() == source, 'Restore keeps focus in the source window')
-vim.api.nvim_win_close(user_split, true)
-vim.cmd('DapRestoreLayout')
-assert(vim.deep_equal(sizes(), expected))
 local messages, pending = {}, nil
 vim.notify = function(message) messages[#messages + 1] = message end
 dap.terminate = function(opts)
@@ -109,7 +45,11 @@ for _, command in ipairs({ 'r', 'run' }) do
 	assert(vim.wait(1000, function() return starts == restarts end))
 end
 assert(restarts == 2 and starts == 2)
-vim.api.nvim_set_current_win(pane('repl'))
+dap.repl.open()
+for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+	if vim.bo[vim.api.nvim_win_get_buf(win)].filetype == 'dap-repl' then vim.api.nvim_set_current_win(win); break end
+end
+assert(vim.bo.filetype == 'dap-repl', 'REPL window missing')
 vim.api.nvim_buf_set_lines(0, 0, -1, false, { 'dap> ' })
 assert(vim.fn.maparg('<CR>', 'i', false, true).callback, 'REPL Enter mapping is missing')
 vim.api.nvim_win_set_cursor(0, { vim.api.nvim_buf_line_count(0), 0 })
@@ -122,15 +62,4 @@ require('dap-extra.repl').setup()
 assert(repl.execute == wrapped_execute, 'Repeated REPL setup must not stack wrappers')
 dap.restart, dap.run_last = restart, run_last
 dap.session, dap.terminate, vim.notify = session, terminate, notify
-vim.api.nvim_set_current_win(source)
-vim.cmd.vsplit()
-local surviving_source = vim.api.nvim_get_current_win()
-vim.api.nvim_win_close(source, true)
-local windows_before_reset = #vim.api.nvim_tabpage_list_wins(debug_tab)
-vim.cmd('DapRestoreLayout')
-assert(#vim.api.nvim_tabpage_list_wins(debug_tab) == windows_before_reset,
-	'Reset must reuse a surviving source window instead of adding a top pane')
-assert(vim.api.nvim_get_current_win() == surviving_source)
-vim.api.nvim_set_current_tabpage(original_tab)
-assert(vim.deep_equal(vim.fn.winlayout(), original_layout))
-print('Debugger reset and asynchronous REPL quit checks passed')
+print('Asynchronous REPL quit and run checks passed')

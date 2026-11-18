@@ -1,6 +1,8 @@
-local root = dofile(vim.fs.dirname(debug.getinfo(1, 'S').source:sub(2)) .. '/bootstrap.lua').root
+local bootstrap = dofile(vim.fs.dirname(debug.getinfo(1, 'S').source:sub(2)) .. '/bootstrap.lua')
+local root = bootstrap.root
+bootstrap.with_dapui()
 local dap = require('dap')
-local ui = require('dap-extra.ui')
+local ui = require('dapui').debug_tab
 local repl = require('dap.repl')
 require('dap-extra').setup()
 local process_id
@@ -74,7 +76,7 @@ assert(vim.wait(5000, function() return stopped() and dap.session().current_fram
 focused()
 vim.api.nvim_set_current_win(origin)
 local frame = dap.session().current_frame
-ui.local_frame()
+require('dap-extra').local_frame()
 assert(vim.api.nvim_get_current_win() == origin and vim.deep_equal(vim.fn.winlayout(), layout))
 assert(dap.session().current_frame == frame and vim.api.nvim_win_get_cursor(0)[1] == frame.line)
 require('dap.ui.widgets').hover('value')
