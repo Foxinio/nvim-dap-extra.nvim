@@ -37,6 +37,11 @@ function M.setup(opts)
 	vim.fn.sign_define('DapBreakpointRejected', { text = '', texthl = 'DiagnosticError', linehl = '', numhl = '' })
 
 	require('dap-extra.repl').setup()
+	-- The rebuild warning must not stop the rest of setup.
+	local ok, err = pcall(require('dap-extra.watch').setup, opts.watch_program)
+	if not ok then
+		vim.notify('dap-extra: rebuild warning disabled: ' .. tostring(err), vim.log.levels.WARN)
+	end
 	configured = true
 end
 
