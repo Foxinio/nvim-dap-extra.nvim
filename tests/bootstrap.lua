@@ -13,11 +13,14 @@ local function add(names)
 	end
 end
 add({ 'nvim-dap', 'nvim-dap-virtual-text' })
+-- The dap-ui fork provides dapui.breakpoints for command/chained breakpoints.
+-- Scripts that check the feature degrades without it set this global first.
+if not DAP_EXTRA_WITHOUT_DAPUI then add({ 'nvim-dap-ui' }) end
 
---- Live/integration scripts also load the Foxinio/nvim-dap-ui fork (debug tab,
---- panes); the unit tests check dap-extra works without it.
+--- Live/integration scripts also set up the fork's panes and debug tab; the
+--- unit tests check dap-extra works without them (it only uses dapui.breakpoints).
 function M.with_dapui()
-	add({ 'nvim-dap-ui', 'nvim-nio' })
+	add({ 'nvim-nio' })
 	require('dapui').setup()
 end
 vim.cmd.cd('/tmp')
