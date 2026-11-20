@@ -3,7 +3,8 @@
 Extras for [nvim-dap](https://github.com/mfussenegger/nvim-dap): GDB-style REPL
 commands with prefix history, stack navigation commands, cppdbg defaults,
 nvim-dap-virtual-text and sign setup, and showing the selected frame in the
-current window. Requires Neovim 0.11+. It does not need nvim-dap-ui.
+current window, plus command and chained breakpoints. Requires Neovim 0.11+.
+Only command and chained breakpoints need the nvim-dap-ui fork.
 
 The debugger UI parts that used to live here (the dedicated debug tab, source
 routing, pane bindings, `:DapRestoreLayout`, `:DapClean`) are now part of the
@@ -16,7 +17,10 @@ routing, pane bindings, `:DapRestoreLayout`, `:DapClean`) are now part of the
 {
   'Foxinio/nvim-dap-extra.nvim',
   lazy = false,
-  dependencies = { 'mfussenegger/nvim-dap', 'theHamsta/nvim-dap-virtual-text' },
+  dependencies = {
+    'mfussenegger/nvim-dap', 'theHamsta/nvim-dap-virtual-text',
+    'Foxinio/nvim-dap-ui', -- optional: command and chained breakpoints
+  },
   opts = { virtual_text = {} },
 }
 ```
@@ -76,11 +80,58 @@ frame. `bt [n]`, `backtrace [n]` and `where [n]` list numbered frames, optionall
 limited to the first n. Frame selection updates the source and variables through
 DAP, keeping them synchronized. Relative moves stop at the ends of the stack.
 
+## Command and chained breakpoints
+
+These need the [Foxinio/nvim-dap-ui](https://github.com/Foxinio/nvim-dap-ui)
+fork, whose `dapui.breakpoints` module stores the extra properties (see
+`:help dapui.breakpoints`). Only that module is loaded, not dap-ui itself.
+Without it, setup warns once that this feature is disabled, the commands below
+report the same, and everything else works as usual. Pass
+`opts = { breakpoints = false }` to turn the feature off without the warning.
+
+- `:DapCommandBreakpoint {cmd}` runs the Vim command `{cmd}` whenever the
+  breakpoint on the cursor line is hit, then continues the program. With `!`
+  the program stays stopped. Without `{cmd}` you are asked for one; an empty
+  command removes it. The command runs while the program is stopped, so it
+  can read the frame (for example `:lua print(require('dap').session().current_frame.line)`).
+- `:DapChainBreakpoint` picks the breakpoints this one waits on (Telescope
+  with `<Tab>` for several, or repeated `vim.ui.select` with a `Done` entry).
+  A chained breakpoint is not sent to the debugger until any one of its
+  parents is hit. Picking nothing removes the chain.
+- `:DapBreakpointReset restart|N` sets when it turns off again: `restart`
+  (default) keeps it on until the next run or restart; `N` turns it off after
+  N hits, until a parent turns it on again.
+
+Both commands add a plain breakpoint if the line has none. The same functions
+are available for mappings:
+
+```lua
+local bp = require('dap-extra').breakpoints
+vim.keymap.set('n', '<leader>dB', bp.chain)
+vim.keymap.set('n', '<leader>dC', function() bp.set_command() end)
+-- bp.set_command(cmd, { stop = true }, buf, line), bp.set_parents({ { buf = b, line = l } }, buf, line),
+-- bp.set_reset('restart' | n, buf, line), bp.parents(buf, line)
+```
+
+In the dap-ui Breakpoints pane, `<CR>` expands any breakpoint into all its
+properties (enabled, condition, hit condition, log message, command, stay
+stopped, parents, turns off) and `e` edits the one under the cursor.
+
+Signs: a breakpoint that is off (disabled, or waiting for a parent) shows `○`;
+an active command breakpoint shows `⚡`. Both stay in nvim-dap's breakpoint
+list, so conditions and log messages are kept while they are off.
+
+Limitations: a logpoint never pauses the program, so it cannot act as a
+parent. Hit counts and chain state are shared by all sessions running at the
+same time and reset whenever a session starts or restarts. Breakpoint hits are
+matched by the adapter's `hitBreakpointIds` or, when it sends none (as
+OpenDebugAD7 does), by the stopped frame's file and line.
+
 ## Checks
 
 ```sh
-make test       # test.lua, test_controls.lua (nvim-dap only)
-make test-live  # test_focus_live.lua, test_exceptions_live.lua (also need the dap-ui fork: make deps-live)
+make test       # test.lua, test_controls.lua, test_breakpoints.lua, test_breakpoints_missing.lua
+make test-live  # test_focus_live.lua, test_exceptions_live.lua, test_breakpoints_live.lua (make deps-live)
 ```
 
 Run from this plugin directory. Tests use only declared dependencies in
