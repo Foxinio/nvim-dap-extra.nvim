@@ -76,10 +76,19 @@ frame. `bt [n]`, `backtrace [n]` and `where [n]` list numbered frames, optionall
 limited to the first n. Frame selection updates the source and variables through
 DAP, keeping them synchronized. Relative moves stop at the ends of the stack.
 
+## Rebuild warning
+
+While a session runs, dap-extra watches the debugged `program` (from the
+launch or attach configuration). If it is rebuilt, you get one warning per
+rebuild: the session still runs the previous build, and `r`/`run` restarts it
+with the new one. Nothing else happens; debugging continues as normal. The
+watch stops when the session ends. Sessions without a `program` are not
+watched. Turn it off with `opts = { watch_program = false }`.
+
 ## Checks
 
 ```sh
-make test       # test.lua, test_controls.lua (nvim-dap only)
+make test       # test.lua, test_controls.lua, test_watch.lua (nvim-dap only)
 make test-live  # test_focus_live.lua, test_exceptions_live.lua (also need the dap-ui fork: make deps-live)
 ```
 
