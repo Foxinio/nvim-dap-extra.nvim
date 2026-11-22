@@ -46,6 +46,11 @@ function M.setup(opts)
 	if not ok then
 		vim.notify('dap-extra: command/chained breakpoints disabled: ' .. tostring(err), vim.log.levels.WARN)
 	end
+	-- The rebuild warning must not stop the rest of setup.
+	ok, err = pcall(require('dap-extra.watch').setup, opts.watch_program)
+	if not ok then
+		vim.notify('dap-extra: rebuild warning disabled: ' .. tostring(err), vim.log.levels.WARN)
+	end
 	configured = true
 end
 

@@ -8,7 +8,7 @@ export DEPS_DIR
 .PHONY: test test-live deps deps-live
 
 test:
-	@for t in test test_controls test_breakpoints test_breakpoints_missing; do $(NVIM) --headless -u NONE -l tests/$$t.lua || exit 1; done
+	@for t in test test_controls test_breakpoints test_breakpoints_missing test_watch; do $(NVIM) --headless -u NONE -l tests/$$t.lua || exit 1; done
 
 # Needs gcc, gdb, ptrace, cpptools' OpenDebugAD7 (Mason) and the dap-ui fork.
 test-live:

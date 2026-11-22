@@ -127,10 +127,19 @@ same time and reset whenever a session starts or restarts. Breakpoint hits are
 matched by the adapter's `hitBreakpointIds` or, when it sends none (as
 OpenDebugAD7 does), by the stopped frame's file and line.
 
+## Rebuild warning
+
+While a session runs, dap-extra watches the debugged `program` (from the
+launch or attach configuration). If it is rebuilt, you get one warning per
+rebuild: the session still runs the previous build, and `r`/`run` restarts it
+with the new one. Nothing else happens; debugging continues as normal. The
+watch stops when the session ends. Sessions without a `program` are not
+watched. Turn it off with `opts = { watch_program = false }`.
+
 ## Checks
 
 ```sh
-make test       # test.lua, test_controls.lua, test_breakpoints.lua, test_breakpoints_missing.lua
+make test       # test.lua, test_controls.lua, test_breakpoints.lua, test_breakpoints_missing.lua, test_watch.lua
 make test-live  # test_focus_live.lua, test_exceptions_live.lua, test_breakpoints_live.lua (make deps-live)
 ```
 
