@@ -9,7 +9,14 @@ function M.setup(opts)
 	opts = opts or {}
 	local dap = require('dap')
 	dap.listeners.on_config['dap-extra'] = function(config)
-		if config.type ~= 'cppdbg' or (config.MIMode and config.MIMode ~= 'gdb') then return config end
+		if config.type ~= 'cppdbg' then return config end
+		-- Configurations copied from common examples set stopAtEntry = true,
+		-- which stops at main on every run.
+		if config.stopAtEntry and not opts.keep_stop_at_entry then
+			config = vim.deepcopy(config)
+			config.stopAtEntry = false
+		end
+		if config.MIMode and config.MIMode ~= 'gdb' then return config end
 		config = vim.deepcopy(config)
 		local commands = config.setupCommands or {}
 		local defaults = {}

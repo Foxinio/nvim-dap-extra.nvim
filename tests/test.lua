@@ -34,6 +34,13 @@ local prepared = configure(config)
 assert(vim.deep_equal(config, original))
 assert(vim.deep_equal(prepared.setupCommands, vim.list_extend(vim.deepcopy(defaults), config.setupCommands)))
 assert(vim.deep_equal(configure(prepared), prepared), 'Repeated configuration duplicated defaults')
+-- stopAtEntry is turned off for every cppdbg session, without mutating the original.
+for _, mode in ipairs({ 'gdb', 'lldb' }) do
+	local entry = { type = 'cppdbg', request = 'launch', MIMode = mode, stopAtEntry = true }
+	assert(configure(entry).stopAtEntry == false, 'stopAtEntry kept for ' .. mode)
+	assert(entry.stopAtEntry == true, 'stopAtEntry change mutated the original configuration')
+end
+assert(configure({ type = 'debugpy', stopAtEntry = true }).stopAtEntry == true, 'Other adapters must be unchanged')
 for _, excluded in ipairs({ { type = 'debugpy' }, { type = 'codelldb' }, { type = 'cppdbg', MIMode = 'lldb' } }) do
 	assert(configure(excluded) == excluded)
 end
