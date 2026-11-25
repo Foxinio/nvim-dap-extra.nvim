@@ -12,7 +12,7 @@ test:
 
 # Needs gcc, gdb, ptrace, cpptools' OpenDebugAD7 (Mason) and the dap-ui fork.
 test-live:
-	@for t in test_focus_live test_exceptions_live test_breakpoints_live; do $(NVIM) --headless -u NONE -l tests/$$t.lua || exit 1; done
+	@for t in test_focus_live test_exceptions_live test_breakpoints_live test_pretty_printers_live; do $(NVIM) --headless -u NONE -l tests/$$t.lua || exit 1; done
 
 deps:
 	@mkdir -p .deps
