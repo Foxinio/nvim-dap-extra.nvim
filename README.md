@@ -32,7 +32,7 @@ Mason, dap-ui and global mappings belong to the caller. Only the GDB REPL
 shortcuts need a GDB/cppdbg session.
 
 For `cppdbg` sessions with `MIMode = 'gdb'` (or omitted), setup automatically
-adds `catch throw`,
+adds `-enable-pretty-printing`, `catch throw`,
 `handle SIGABRT SIGSEGV SIGBUS SIGILL SIGFPE stop print pass`, and a pending
 `pthread_kill` function breakpoint to startup commands.
 This stops on every C++ throw, including handled exceptions, and on common fatal
@@ -41,6 +41,11 @@ Continuing delivers the signal and may terminate the program. Existing
 `setupCommands` run afterward and can override signal handling. Other adapters
 and explicit LLDB sessions are unchanged. Every `pthread_kill` call stops,
 including calls sending harmless signals.
+
+Pretty printing makes GDB use the printers it auto-loads, such as libstdc++'s,
+so `std::vector`, `std::string` and `std::map` show their contents instead of
+internal members. A GDB without Python support ignores it. To turn it off, add
+`{ text = '-disable-pretty-printing' }` to your own `setupCommands`.
 
 `cppdbg` sessions also never stop at `main` on their own: setup turns
 `stopAtEntry` off, which configurations copied from common examples set to
@@ -145,7 +150,7 @@ watched. Turn it off with `opts = { watch_program = false }`.
 
 ```sh
 make test       # test.lua, test_controls.lua, test_breakpoints.lua, test_breakpoints_missing.lua, test_watch.lua, test_stop_at_entry.lua
-make test-live  # test_focus_live.lua, test_exceptions_live.lua, test_breakpoints_live.lua (make deps-live)
+make test-live  # test_focus_live.lua, test_exceptions_live.lua, test_breakpoints_live.lua, test_pretty_printers_live.lua (make deps-live)
 ```
 
 Run from this plugin directory. Tests use only declared dependencies in

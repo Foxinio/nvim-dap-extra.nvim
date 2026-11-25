@@ -20,10 +20,16 @@ function M.setup(opts)
 		config = vim.deepcopy(config)
 		local commands = config.setupCommands or {}
 		local defaults = {}
-		for _, text in ipairs({ 'catch throw', 'handle SIGABRT SIGSEGV SIGBUS SIGILL SIGFPE stop print pass',
-			'-break-insert -f pthread_kill' }) do
-			if not vim.iter(commands):any(function(command) return command.text == text end) then
-				defaults[#defaults + 1] = { text = text }
+		for _, default in ipairs({
+			-- GDB auto-loads pretty printers (libstdc++'s and others) but only
+			-- applies them over MI once enabled; tolerated without Python support.
+			{ text = '-enable-pretty-printing', description = 'Enable pretty-printing for gdb', ignoreFailures = true },
+			{ text = 'catch throw' },
+			{ text = 'handle SIGABRT SIGSEGV SIGBUS SIGILL SIGFPE stop print pass' },
+			{ text = '-break-insert -f pthread_kill' },
+		}) do
+			if not vim.iter(commands):any(function(command) return command.text == default.text end) then
+				defaults[#defaults + 1] = default
 			end
 		end
 		config.setupCommands = vim.list_extend(defaults, commands)

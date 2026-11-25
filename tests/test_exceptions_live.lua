@@ -48,8 +48,9 @@ local function wait_for_stop(count, caller)
 				and (caller ~= 'signal_thread' or lines:find('pthread_kill', 1, true) ~= nil)
 		end, 20), 'Stacks pane still shows the previous stop instead of ' .. caller)
 	end
-	assert(session.config.setupCommands[1].text == 'catch throw')
-	assert(#session.config.setupCommands == 3, 'Restart duplicated defaults')
+	assert(session.config.setupCommands[1].text == '-enable-pretty-printing')
+	assert(session.config.setupCommands[2].text == 'catch throw')
+	assert(#session.config.setupCommands == 4, 'Restart duplicated defaults')
 end
 dap.run({
 	name = 'exception defaults', type = 'cppdbg', request = 'launch',
