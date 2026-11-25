@@ -17,6 +17,7 @@ require('dap-extra').setup()
 assert(listener_count() == listeners, 'Repeated setup added listeners')
 local configure = dap.listeners.on_config['dap-extra']
 local defaults = {
+	{ text = '-enable-pretty-printing', description = 'Enable pretty-printing for gdb', ignoreFailures = true },
 	{ text = 'catch throw' },
 	{ text = 'handle SIGABRT SIGSEGV SIGBUS SIGILL SIGFPE stop print pass' },
 	{ text = '-break-insert -f pthread_kill' },
@@ -34,6 +35,11 @@ local prepared = configure(config)
 assert(vim.deep_equal(config, original))
 assert(vim.deep_equal(prepared.setupCommands, vim.list_extend(vim.deepcopy(defaults), config.setupCommands)))
 assert(vim.deep_equal(configure(prepared), prepared), 'Repeated configuration duplicated defaults')
+-- A command already in the user's setupCommands is not added twice.
+local own = configure({ type = 'cppdbg', setupCommands = { { text = '-enable-pretty-printing' } } })
+assert(#vim.tbl_filter(function(command) return command.text == '-enable-pretty-printing' end,
+	own.setupCommands) == 1, 'Pretty printing was enabled twice')
+assert(own.setupCommands[#own.setupCommands].text == '-enable-pretty-printing', 'User command must stay last')
 for _, excluded in ipairs({ { type = 'debugpy' }, { type = 'codelldb' }, { type = 'cppdbg', MIMode = 'lldb' } }) do
 	assert(configure(excluded) == excluded)
 end
