@@ -47,6 +47,11 @@ so `std::vector`, `std::string` and `std::map` show their contents instead of
 internal members. A GDB without Python support ignores it. To turn it off, add
 `{ text = '-disable-pretty-printing' }` to your own `setupCommands`.
 
+`cppdbg` sessions also never stop at `main` on their own: setup turns
+`stopAtEntry` off, which configurations copied from common examples set to
+`true`. Breakpoints in `main` still stop. To keep your configuration's
+`stopAtEntry`, use `opts = { keep_stop_at_entry = true }`.
+
 ## Selected frame here
 
 ```lua
@@ -144,7 +149,7 @@ watched. Turn it off with `opts = { watch_program = false }`.
 ## Checks
 
 ```sh
-make test       # test.lua, test_controls.lua, test_breakpoints.lua, test_breakpoints_missing.lua, test_watch.lua
+make test       # test.lua, test_controls.lua, test_breakpoints.lua, test_breakpoints_missing.lua, test_watch.lua, test_stop_at_entry.lua
 make test-live  # test_focus_live.lua, test_exceptions_live.lua, test_breakpoints_live.lua, test_pretty_printers_live.lua (make deps-live)
 ```
 

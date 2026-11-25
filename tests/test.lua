@@ -40,6 +40,13 @@ local own = configure({ type = 'cppdbg', setupCommands = { { text = '-enable-pre
 assert(#vim.tbl_filter(function(command) return command.text == '-enable-pretty-printing' end,
 	own.setupCommands) == 1, 'Pretty printing was enabled twice')
 assert(own.setupCommands[#own.setupCommands].text == '-enable-pretty-printing', 'User command must stay last')
+-- stopAtEntry is turned off for every cppdbg session, without mutating the original.
+for _, mode in ipairs({ 'gdb', 'lldb' }) do
+	local entry = { type = 'cppdbg', request = 'launch', MIMode = mode, stopAtEntry = true }
+	assert(configure(entry).stopAtEntry == false, 'stopAtEntry kept for ' .. mode)
+	assert(entry.stopAtEntry == true, 'stopAtEntry change mutated the original configuration')
+end
+assert(configure({ type = 'debugpy', stopAtEntry = true }).stopAtEntry == true, 'Other adapters must be unchanged')
 for _, excluded in ipairs({ { type = 'debugpy' }, { type = 'codelldb' }, { type = 'cppdbg', MIMode = 'lldb' } }) do
 	assert(configure(excluded) == excluded)
 end
