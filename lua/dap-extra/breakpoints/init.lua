@@ -176,8 +176,7 @@ function M.setup(enabled)
 	local hits = require('dap-extra.breakpoints.hits')
 	local dap = require('dap')
 	dap.listeners.before.event_initialized['dap-extra.breakpoints'] = hits.on_initialized
-	dap.listeners.after.event_stopped['dap-extra.breakpoints'] = hits.on_stopped
-	dap.listeners.before.stackTrace['dap-extra.breakpoints'] = hits.on_stack_trace
+	require('dap-extra.stops').subscribe('dap-extra.breakpoints', hits.handle)
 	M.available, configured = true, true
 end
 

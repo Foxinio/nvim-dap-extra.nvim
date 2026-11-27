@@ -53,6 +53,12 @@ function M.setup(opts)
 	vim.fn.sign_define('DapBreakpointRejected', { text = '', texthl = 'DiagnosticError', linehl = '', numhl = '' })
 
 	require('dap-extra.repl').setup()
+	-- Breakpoint stops: which breakpoints were hit, and re-checking conditions
+	-- (cppdbg can stop on a breakpoint it is still about to replace).
+	local stops_ok, stops_err = pcall(require('dap-extra.stops').setup, opts.recheck_conditions)
+	if not stops_ok then
+		vim.notify('dap-extra: breakpoint stop handling disabled: ' .. tostring(stops_err), vim.log.levels.WARN)
+	end
 	-- Command/chained breakpoints need the dap-ui fork; nothing here may stop
 	-- the rest of setup.
 	local ok, err = pcall(require('dap-extra.breakpoints').setup, opts.breakpoints)
