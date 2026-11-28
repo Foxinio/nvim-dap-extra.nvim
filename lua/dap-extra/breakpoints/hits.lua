@@ -1,5 +1,6 @@
---- Noticing which breakpoints were hit, turning chained ones on or off,
---- running commands and continuing.
+--- What a breakpoint hit does: turning chained breakpoints on or off,
+--- running commands and continuing. Which breakpoints were hit comes from
+--- dap-extra.stops.
 local M = {}
 
 local state = require('dap-extra.breakpoints.state')
@@ -70,68 +71,11 @@ local function run_commands(session, thread_id, hits)
 	vim.schedule(run)
 end
 
-local function buffer_for_path(path)
-	if not path then return nil end
-	local target = vim.fs.normalize(vim.fn.fnamemodify(path, ':p'))
-	for _, data in ipairs(state.store.list()) do
-		if vim.fs.normalize(vim.fn.fnamemodify(data.name, ':p')) == target then return data.buffer end
-	end
-end
-
-local function hits_from_ids(ids)
-	local wanted, hits = {}, {}
-	for _, id in ipairs(ids or {}) do wanted[id] = true end
-	if next(wanted) == nil then return hits end
-	for buf, buf_bps in pairs(require('dap.breakpoints').get()) do
-		for _, bp in ipairs(buf_bps) do
-			if bp.state and wanted[bp.state.id] then hits[#hits + 1] = { buf = buf, line = bp.line } end
-		end
-	end
-	return hits
-end
-
-local function hits_from_frame(frame)
-	local buf = frame and frame.source and buffer_for_path(frame.source.path)
-	if not buf then return {} end
-	for _, bp in ipairs(require('dap.breakpoints').get(buf)[buf] or {}) do
-		if bp.line == frame.line or (bp.state and bp.state.line == frame.line) then
-			return { { buf = buf, line = bp.line } }
-		end
-	end
-	return {}
-end
-
---- Stops waiting for their top frame: session → thread id → true.
-local pending = setmetatable({}, { __mode = 'k' })
-
-local function handle_hits(session, thread_id, hits)
+--- Handle breakpoint hits reported by dap-extra.stops (after its condition
+--- check): count them, turn on chained breakpoints, run commands.
+function M.handle(session, thread_id, hits)
 	for _, hit in ipairs(hits) do on_hit(hit.buf, hit.line) end
 	run_commands(session, thread_id, hits)
-end
-
-function M.on_stopped(session, body)
-	if not body or body.reason ~= 'breakpoint' then return end
-	local hits = hits_from_ids(body.hitBreakpointIds)
-	if #hits > 0 or not body.threadId then return handle_hits(session, body.threadId, hits) end
-	-- Without hit ids, match the top frame. nvim-dap requests it itself; its
-	-- response is handled in _on_stack_trace before nvim-dap shows the frame,
-	-- so breakpoints are updated before anyone can continue.
-	pending[session] = pending[session] or {}
-	pending[session][body.threadId] = true
-	vim.defer_fn(function()
-		if not (pending[session] and pending[session][body.threadId]) then return end
-		session:request('stackTrace', { threadId = body.threadId, startFrame = 0, levels = 1 }, function(err, response)
-			M.on_stack_trace(session, err, response, { threadId = body.threadId, startFrame = 0 })
-		end)
-	end, 1000)
-end
-
-function M.on_stack_trace(session, err, response, request)
-	local threads = pending[session]
-	local thread_id = request and request.threadId
-	if err or not response or not threads or not threads[thread_id] or (request.startFrame or 0) ~= 0 then return end
-	threads[thread_id] = nil
-	handle_hits(session, thread_id, hits_from_frame((response.stackFrames or {})[1]))
 end
 
 function M.on_initialized()

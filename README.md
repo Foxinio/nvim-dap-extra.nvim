@@ -137,6 +137,19 @@ same time and reset whenever a session starts or restarts. Breakpoint hits are
 matched by the adapter's `hitBreakpointIds` or, when it sends none (as
 OpenDebugAD7 does), by the stopped frame's file and line.
 
+## Breakpoint conditions are re-checked
+
+cppdbg replaces a breakpoint whose condition (or hit condition, or log message)
+changes while the program runs by adding the new breakpoint at once and
+deleting the old one only at the next stop, so the old breakpoint can still stop
+the program once. On every breakpoint stop, dap-extra evaluates the hit
+breakpoint's condition in the stopped frame and continues at once when it is
+clearly false (`false` or `0`); any other result, including an evaluation
+error, keeps the stop. Such a stop also doesn't run a breakpoint command or turn
+on chained breakpoints. You may see the stop briefly. Hit conditions can't be
+re-checked, and a condition with side effects is evaluated once more. Turn it
+off with `opts = { recheck_conditions = false }`. This needs only nvim-dap.
+
 ## Rebuild warning
 
 While a session runs, dap-extra watches the debugged `program` (from the
@@ -149,8 +162,8 @@ watched. Turn it off with `opts = { watch_program = false }`.
 ## Checks
 
 ```sh
-make test       # test.lua, test_controls.lua, test_breakpoints.lua, test_breakpoints_missing.lua, test_watch.lua, test_stop_at_entry.lua
-make test-live  # test_focus_live.lua, test_exceptions_live.lua, test_breakpoints_live.lua, test_pretty_printers_live.lua (make deps-live)
+make test       # test.lua, test_controls.lua, test_breakpoints.lua, test_breakpoints_missing.lua, test_watch.lua, test_stop_at_entry.lua, test_stops.lua
+make test-live  # test_focus_live.lua, test_exceptions_live.lua, test_breakpoints_live.lua, test_pretty_printers_live.lua, test_condition_live.lua (make deps-live)
 ```
 
 Run from this plugin directory. Tests use only declared dependencies in

@@ -32,6 +32,7 @@ dap_breakpoints.set({ condition = 'x > 1' }, buf, 4)
 
 -- A fake session that records what nvim-dap would send to the adapter.
 local frames = {}
+local condition_result = '1'
 local session = setmetatable({ children = {}, steps = {}, threads = {} }, {
 	__index = {
 		set_breakpoints = function(self, bps)
@@ -43,6 +44,9 @@ local session = setmetatable({ children = {}, steps = {}, threads = {} }, {
 		request = function(self, command, args, callback)
 			if command == 'stackTrace' then
 				callback(nil, { stackFrames = { frames[args.threadId] } })
+			elseif command == 'evaluate' then
+				-- Conditions re-checked on breakpoint stops hold unless a test says not.
+				callback(nil, { result = condition_result })
 			elseif command == 'continue' then
 				self.steps[#self.steps + 1] = 'continue-request'
 				callback(nil, {})
@@ -65,13 +69,13 @@ end
 local function stop(body)
 	session.stopped_thread_id = body.threadId
 	body.reason = body.reason or 'breakpoint'
-	dap.listeners.after.event_stopped['dap-extra.breakpoints'](session, body)
+	dap.listeners.after.event_stopped['dap-extra.stops'](session, body)
 end
 -- nvim-dap fetches the stopped thread's stack; dap-extra reads that response.
 local function hit_line(line)
 	frames[1] = { id = 1, line = line, source = { path = file } }
 	stop({ threadId = 1 })
-	dap.listeners.before.stackTrace['dap-extra.breakpoints'](session, nil, { stackFrames = { frames[1] } },
+	dap.listeners.before.stackTrace['dap-extra.stops'](session, nil, { stackFrames = { frames[1] } },
 		{ threadId = 1, startFrame = 0 })
 	-- nvim-dap sets the new frame after the before-listeners ran.
 	session.current_frame = { id = 1 }
@@ -136,6 +140,15 @@ hit_line(6)
 assert(vim.wait(1000, function() return vim.g.hit == 2 end))
 vim.wait(50, function() return false end)
 assert(#session.steps == 1, 'stop = true must not continue')
+-- A command breakpoint whose condition is false when it stops (a stale stop
+-- from cppdbg) is continued without running the command.
+store.set(buf, 6, 'condition', 'x == 9')
+condition_result, session.steps = '0', {}
+hit_line(6)
+vim.wait(100, function() return false end)
+assert(vim.g.hit == 2 and vim.deep_equal(session.steps, { 'continue' }), vim.inspect(session.steps))
+store.set(buf, 6, 'condition', nil)
+condition_result = '1'
 -- A failing command is reported and does not raise.
 local notify, messages = vim.notify, {}
 vim.notify = function(message) messages[#messages + 1] = message end
